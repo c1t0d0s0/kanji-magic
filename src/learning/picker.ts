@@ -21,6 +21,8 @@ export interface PickOptions {
     used: ReadonlySet<string>;
     strokesOf: (kanji: string) => number;
     random?: () => number;
+    // Choose among these only (else all the kanji of the grades)
+    pool?: readonly KanjiItem[];
 }
 
 export function candidates(grade: number, only: boolean): KanjiItem[] {
@@ -44,7 +46,7 @@ function totalAsked(progress: ProgressMap) {
 
 export function pickKanji(o: PickOptions): KanjiItem {
     const random = o.random ?? Math.random;
-    let list = candidates(o.grade, o.only);
+    let list = o.pool ? [...o.pool] : candidates(o.grade, o.only);
     if (o.grade === 1 && totalAsked(o.progress) < FIRST_EASY) {
         const easy = list.filter(k => o.strokesOf(k.kanji) <= EASY_STROKES);
         if (easy.length > 0) list = easy;
@@ -67,4 +69,37 @@ export function pickKanji(o: PickOptions): KanjiItem {
 // The list of recent kanji after one more is asked
 export function pushRecent(recent: readonly string[], kanji: string): string[] {
     return [...recent.filter(k => k !== kanji), kanji].slice(-RECENT);
+}
+
+// --- The 3 kanji to choose from (the magic circle): one of 炎, one of 水, one of 木 ---
+// Each is chosen as pickKanji chooses (weights, not recent, not twice in a battle, easy at first),
+// among the kanji of its element; when an element has none left, a kanji of any other group comes.
+// The 3 are all different.
+export const CHOICES = 3;
+
+export function pickChoices(o: PickOptions, groupOf: (kanji: string) => string): KanjiItem[] {
+    const out: KanjiItem[] = [];
+    const taken = new Set(o.used);
+    for (const element of ['fire', 'water', 'wood']) {
+        const k = pickFrom(o, taken, k => groupOf(k) === element);
+        if (k) {
+            out.push(k);
+            taken.add(k.kanji);
+        }
+    }
+    while (out.length < CHOICES) {
+        const have = new Set(out.map(k => groupOf(k.kanji)));
+        // Something else than the groups there already, if it can
+        const k = pickFrom(o, taken, k => !have.has(groupOf(k))) ?? pickKanji({ ...o, used: taken });
+        out.push(k);
+        taken.add(k.kanji);
+    }
+    return out;
+}
+
+// pickKanji among the kanji that `keep` lets through, none of `taken`; null if there are none
+function pickFrom(o: PickOptions, taken: ReadonlySet<string>, keep: (kanji: string) => boolean): KanjiItem | null {
+    const list = candidates(o.grade, o.only).filter(k => keep(k.kanji) && !taken.has(k.kanji));
+    if (list.length === 0) return null;
+    return pickKanji({ ...o, used: taken, only: o.only, pool: list });
 }

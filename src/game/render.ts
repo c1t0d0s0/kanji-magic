@@ -4,7 +4,8 @@
 import { drawMushroomHouse, drawPillowTower } from '../art/bases';
 import { ART } from '../art/characters';
 import { drawFly, drawShot, drawStomp } from '../art/fx';
-import { star } from '../art/parts';
+import { drawMark } from '../art/marks';
+import { shout, star } from '../art/parts';
 import type { Pose } from '../art/pose';
 import { LANE } from '../config';
 import type { Base, Battle, Fighter, Fx } from './battle';
@@ -101,6 +102,8 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         }
     }
     if (boosted && f.side === 'ally') star(ctx, f.x - r * 0.8, GROUND - size - 6 + Math.sin(time / 120 + f.id) * 3, 6, '#ffd84a', time / 300);
+    // The element, over the head
+    if (f.element) drawMark(ctx, f.element, f.x + (f.side === 'ally' ? r * 0.55 : -r * 0.55), GROUND - size * 1.05, f.boss ? 22 : 15);
     if (f.hp < f.maxHp) bar(ctx, f.x, GROUND - size * 1.15 - 18, Math.max(30, f.size), f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d');
 }
 
@@ -197,6 +200,25 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             break;
         case 'stomp':
             drawStomp(ctx, fx.x, GROUND, t);
+            break;
+        case 'spark':
+            // A hit on the element it beats: stars burst out
+            for (let k = 0; k < 4; k++) {
+                const a = (k * Math.PI) / 2 + t * 2;
+                star(ctx, fx.x + Math.cos(a) * 14 * (0.5 + t), GROUND - (fx.who?.size ?? 30) * 0.7 + Math.sin(a) * 14 * (0.5 + t), 6 * fade, '#ffe14a', a);
+            }
+            break;
+        case 'good':
+            shout(ctx, 'よく きいた！', width / 2, 150 - t * 20, 40, '#e8590c', fade * 1.5);
+            break;
+        case 'weak':
+            shout(ctx, 'いまいち…', width / 2, 150 - t * 10, 32, '#6c757d', fade * 1.5);
+            break;
+        case 'change':
+            if (fx.who?.element) {
+                shout(ctx, 'ぞくせい チェンジ！', fx.x, GROUND - (fx.who.size * 1.3) - 70 - t * 20, 22, '#7a2c4d', fade * 1.5);
+                drawMark(ctx, fx.who.element, fx.x, GROUND - fx.who.size * 1.3 - 40 - t * 20, 30 * (1 + 0.3 * Math.sin(t * Math.PI)));
+            }
             break;
         case 'fire':
             // Pillars of fire over the field

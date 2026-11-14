@@ -1,11 +1,15 @@
 // --- The 10 stages (requirements 5.4): data only, battle.ts plays them ---
 // The enemies are the same in every grade (the kanji are what get harder). Each spawn rule sends
 // one enemy at `from` seconds, then one every `every` seconds, `count` times at most. A stage takes
-// 2 to 4 minutes (checked by tests/battle.test.ts with a simple player).
+// 2 to 4 minutes (checked by tests/battle.test.ts with a simple player). The enemies of a rule have
+// its element: from the 3rd stage most have one, and choosing the units and the kanji that beat it
+// makes the battle much easier ('cycle': the last boss changes it every BOSS_ELEMENT_MS).
+import type { Element } from '../spell/elements';
 import type { EnemyId } from './enemies';
 
 export interface Spawn {
     enemy: EnemyId;
+    element?: Element | 'cycle';
     from: number;
     every: number;
     count?: number;
@@ -34,44 +38,57 @@ export const STAGES: readonly Stage[] = [
     },
     {
         id: 2, name: 'わすれんぼうの [森|もり]', power: 1.6, enemyBaseHp: 5000, allyBaseHp: 2000, reward: 25,
-        spawns: [{ enemy: 'zako', from: 4, every: 7 }, { enemy: 'fast', from: 40, every: 25 }]
+        spawns: [{ enemy: 'zako', from: 4, every: 7 }, { enemy: 'fast', element: 'wood', from: 40, every: 25 }]
     },
     {
         id: 3, name: 'かちこち [洞窟|どうくつ]', power: 1.9, enemyBaseHp: 6500, allyBaseHp: 2200, reward: 30,
-        spawns: [{ enemy: 'zako', from: 3, every: 6 }, { enemy: 'hard', from: 30, every: 30 }, { enemy: 'fast', from: 50, every: 22 }]
+        spawns: [{ enemy: 'zako', element: 'water', from: 3, every: 6 }, { enemy: 'hard', element: 'water', from: 30, every: 30 }, { enemy: 'fast', from: 50, every: 22 }]
     },
     {
         id: 4, name: 'ぽいぽい [谷|たに]', power: 2.2, enemyBaseHp: 6500, allyBaseHp: 2200, reward: 35,
-        spawns: [{ enemy: 'zako', from: 3, every: 6 }, { enemy: 'thrower', from: 20, every: 20 }, { enemy: 'hard', from: 60, every: 35 }]
+        spawns: [{ enemy: 'zako', element: 'fire', from: 3, every: 6 }, { enemy: 'thrower', element: 'fire', from: 20, every: 20 }, { enemy: 'hard', from: 60, every: 35 }]
     },
     {
         id: 5, name: 'おおわすれんぼうの [城|しろ]', power: 2.2, enemyBaseHp: 6500, allyBaseHp: 2500, reward: 60, boss: true,
-        spawns: [{ enemy: 'zako', from: 3, every: 7 }, { enemy: 'fast', from: 20, every: 20 }, { enemy: 'boss', from: 45, every: 1, count: 1 }, { enemy: 'thrower', from: 70, every: 25 }]
+        spawns: [{ enemy: 'zako', element: 'wood', from: 3, every: 7 }, { enemy: 'fast', element: 'fire', from: 20, every: 20 }, { enemy: 'boss', element: 'fire', from: 45, every: 1, count: 1 }, { enemy: 'thrower', element: 'wood', from: 70, every: 25 }]
     },
     {
         id: 6, name: 'はやかぜ [草原|そうげん]', power: 2.7, enemyBaseHp: 9500, allyBaseHp: 2500, reward: 45,
-        spawns: [{ enemy: 'fast', from: 3, every: 6 }, { enemy: 'zako', from: 10, every: 8 }, { enemy: 'hard', from: 40, every: 30 }]
+        spawns: [{ enemy: 'fast', element: 'wood', from: 3, every: 6 }, { enemy: 'zako', element: 'wood', from: 10, every: 8 }, { enemy: 'hard', element: 'water', from: 40, every: 30 }]
     },
     {
-        id: 7, name: '[岩山|いわやま] [砦|とりで]', power: 3.0, enemyBaseHp: 11000, allyBaseHp: 2800, reward: 50,
-        spawns: [{ enemy: 'hard', from: 5, every: 18 }, { enemy: 'zako', from: 3, every: 6 }, { enemy: 'thrower', from: 30, every: 20 }]
+        id: 7, name: '[岩山|いわやま] [砦|とりで]', power: 3.3, enemyBaseHp: 11000, allyBaseHp: 2800, reward: 50,
+        spawns: [{ enemy: 'hard', element: 'fire', from: 5, every: 18 }, { enemy: 'zako', element: 'fire', from: 3, every: 6 }, { enemy: 'thrower', element: 'fire', from: 30, every: 20 }]
     },
     {
         id: 8, name: '[消|け]しゴムの [雨|あめ]', power: 3.3, enemyBaseHp: 9500, allyBaseHp: 2800, reward: 55,
-        spawns: [{ enemy: 'thrower', from: 5, every: 12 }, { enemy: 'zako', from: 3, every: 6 }, { enemy: 'fast', from: 30, every: 15 }]
+        spawns: [{ enemy: 'thrower', element: 'wood', from: 5, every: 12 }, { enemy: 'zako', element: 'wood', from: 3, every: 6 }, { enemy: 'fast', element: 'water', from: 30, every: 15 }]
     },
     {
         id: 9, name: 'わすれの [迷宮|めいきゅう]', power: 3.6, enemyBaseHp: 10000, allyBaseHp: 3000, reward: 60,
-        spawns: [{ enemy: 'zako', from: 2, every: 5 }, { enemy: 'hard', from: 15, every: 22 }, { enemy: 'fast', from: 25, every: 14 }, { enemy: 'thrower', from: 35, every: 18 }]
+        spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 5 }, { enemy: 'hard', element: 'wood', from: 15, every: 22 }, { enemy: 'fast', element: 'water', from: 25, every: 14 }, { enemy: 'thrower', element: 'fire', from: 35, every: 18 }]
     },
     {
-        id: 10, name: '[最後|さいご]の [戦|たたか]い', power: 3.8, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 120, boss: true,
+        id: 10, name: '[最後|さいご]の [戦|たたか]い', power: 2.6, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 120, boss: true,
         spawns: [
-            { enemy: 'zako', from: 2, every: 5 }, { enemy: 'fast', from: 15, every: 15 }, { enemy: 'hard', from: 25, every: 25 },
-            { enemy: 'boss', from: 50, every: 1, count: 1 }, { enemy: 'thrower', from: 60, every: 18 }, { enemy: 'boss', from: 150, every: 1, count: 1 }
+            { enemy: 'zako', element: 'wood', from: 2, every: 7 }, { enemy: 'fast', element: 'water', from: 15, every: 18 }, { enemy: 'hard', element: 'fire', from: 25, every: 30 },
+            { enemy: 'boss', element: 'cycle', from: 50, every: 1, count: 1 }, { enemy: 'thrower', element: 'water', from: 60, every: 24 }, { enemy: 'boss', element: 'cycle', from: 150, every: 1, count: 1 }
         ]
     }
 ];
+
+// The kinds of enemies of a stage with their elements, once each (shown before the battle)
+export function stageEnemies(stage: Stage): { enemy: EnemyId; element: Element | 'cycle' | null }[] {
+    const seen = new Set<string>();
+    const out: { enemy: EnemyId; element: Element | 'cycle' | null }[] = [];
+    for (const r of stage.spawns) {
+        const key = `${r.enemy}:${r.element ?? ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ enemy: r.enemy, element: r.element ?? null });
+    }
+    return out;
+}
 
 export function stageById(id: number): Stage {
     const s = STAGES.find(st => st.id === id);

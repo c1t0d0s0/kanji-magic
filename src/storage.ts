@@ -9,7 +9,7 @@ import { RECENT } from './learning/picker';
 
 export const SAVE_KEY = 'kmw:save:v1';
 export const SAVE_VERSION = 1;
-export const DECK_SIZE = 5;
+export const DECK_SIZE = 3;
 
 export interface Settings {
     grade: number;

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // --- The 10 stages: cleared ones with their stars, the next one open, the rest locked ---
 import Furi from '../components/Furi.vue';
-import { STAGES } from '../game/stages';
+import ElementMark from '../components/ElementMark.vue';
+import { STAGES, stageEnemies } from '../game/stages';
 import { go, isOpen, save, ui } from '../store';
 
 function choose(id: number) {
@@ -9,6 +10,9 @@ function choose(id: number) {
     ui.stageId = id;
     go('formation');
 }
+
+// The elements of a stage's enemies, once each
+const marksOf = (id: number) => [...new Set(stageEnemies(STAGES.find(s => s.id === id)!).map(f => f.element).filter(e => e !== null))];
 
 const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 </script>
@@ -24,7 +28,7 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
             <li v-for="s in STAGES" :key="s.id">
                 <button type="button" class="stage card" :disabled="!isOpen(s.id)" @click="choose(s.id)">
                     <span class="stage-no">{{ s.id }}</span>
-                    <span class="stage-name"><Furi :text="isOpen(s.id) ? s.name : '？？？'" /><span v-if="s.boss && isOpen(s.id)" aria-label="ボス"> 👹</span></span>
+                    <span class="stage-name"><Furi :text="isOpen(s.id) ? s.name : '？？？'" /><span v-if="s.boss && isOpen(s.id)" aria-label="ボス"> 👹</span><span v-if="isOpen(s.id)" class="stage-marks"><ElementMark v-for="m in marksOf(s.id)" :key="m" :mark="m" :size="18" /></span></span>
                     <span v-if="!isOpen(s.id)" class="stage-lock" aria-label="まだ 遊べないよ">🔒</span>
                     <span v-else class="stars" :aria-label="`星 ${save.stages[s.id]?.stars ?? 0}こ`">{{ stars(save.stages[s.id]?.stars ?? 0) }}</span>
                 </button>
@@ -71,6 +75,12 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
     background: var(--ink);
     color: var(--on-ink);
     font-weight: 700;
+}
+
+.stage-marks {
+    display: inline-flex;
+    gap: 0.15rem;
+    margin-left: 0.4rem;
 }
 
 .stage-name {

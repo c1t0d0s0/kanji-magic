@@ -29,8 +29,8 @@ describe('spell groups', () => {
         expect(spellGroup('言')).toBe('word');
     });
 
-    it('the radical chooses the group; a radical not in the table is ふしぎ', () => {
-        const expected: Record<string, SpellGroup> = { 海: 'water', 点: 'fire', 花: 'wood', 算: 'wood', 前: 'metal', 語: 'word', 名: 'word', 一: 'wonder', 天: 'wonder' };
+    it('the radical chooses the group (then the parts and the meaning, spell/elements.ts); else ふしぎ', () => {
+        const expected: Record<string, SpellGroup> = { 海: 'water', 点: 'fire', 花: 'wood', 算: 'wood', 前: 'metal', 語: 'word', 名: 'word', 一: 'wonder', 天: 'wonder', 談: 'fire', 日: 'fire', 雪: 'water', 川: 'water', 米: 'wood' };
         for (const [k, g] of Object.entries(expected)) expect(spellGroup(k), k).toBe(g);
         expect(spellGroup('A')).toBe('wonder');
     });
@@ -60,13 +60,17 @@ describe('spell power', () => {
             const size = (g: 'perfect' | 'success' | 'close') => {
                 const e = spellEffect(k, g, n)!;
                 expect(e.group).toBe(spellGroup(k));
-                return e.kind === 'damage' ? e.damage : e.kind === 'push' ? e.push : e.kind === 'stop' ? e.ms : e.kind === 'shield' ? e.shield : e.rate;
+                return e.kind === 'attack' ? e.damage : e.kind === 'shield' ? e.shield : e.rate;
             };
             expect(size('perfect')).toBeGreaterThan(size('success'));
             expect(size('success')).toBeGreaterThan(size('close'));
         }
         const a = spellEffect('火', 'success', 4)!, b = spellEffect('火', 'success', 12)!;
-        expect(a.kind === 'damage' && b.kind === 'damage' && b.damage > a.damage).toBe(true);
+        expect(a.kind === 'attack' && b.kind === 'attack' && b.damage > a.damage).toBe(true);
+        // 水 pushes back and 木 stops, besides the damage
+        const w = spellEffect('海', 'success', 9)!, t = spellEffect('森', 'success', 12)!;
+        expect(w.kind === 'attack' && w.push > 0 && w.stopMs === 0 && w.element === 'water').toBe(true);
+        expect(t.kind === 'attack' && t.stopMs > 0 && t.push === 0 && t.element === 'wood').toBe(true);
     });
 
     it('ことば makes the attack ×1.5 for a plain せいこう without strokes', () => {

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { kanjiDatabase } from '../src/vendor/kanji-quiz/src/data/kanji';
 import { strokes as models } from '../src/vendor/kanji-quiz/src/data/kanjivg';
 import { createRng } from '../src/vendor/kanji-quiz/src/core/battle';
-import { EASY_STROKES, FIRST_EASY, RECENT, WEIGHT, pickKanji, pushRecent, weightOf, type PickOptions } from '../src/learning/picker';
+import { CHOICES, EASY_STROKES, FIRST_EASY, RECENT, WEIGHT, pickChoices, pickKanji, pushRecent, weightOf, type PickOptions } from '../src/learning/picker';
+import { spellGroup } from '../src/spell/effects';
 import { MASTER_PERFECTS, emptyProgress, isRegistered, recordSpell, type ProgressMap } from '../src/learning/progress';
 import { canShow } from '../src/learning/visible';
 import { SAVE_KEY, defaultSave, loadSave, parseSave, writeSave } from '../src/storage';
@@ -105,6 +106,44 @@ describe('pickKanji', () => {
         for (let i = 0; i < 3000; i++) if (pickKanji(opts({ progress: m, used, random })).kanji === '火') fire++;
         expect(fire / 3000).toBeGreaterThan(0.85);
         expect(fire / 3000).toBeLessThan(0.97);
+    });
+});
+
+describe('pickChoices', () => {
+    it('3 different kanji: one of 炎, one of 水, one of 木 while there are some', () => {
+        for (const grade of [1, 2, 4, 6]) {
+            const random = createRng(`choices${grade}`);
+            const used = new Set<string>();
+            let recent: string[] = [];
+            const progress = played();
+            for (let i = 0; i < 12; i++) {
+                const list = pickChoices(opts({ grade, used, recent, progress, random }), spellGroup);
+                expect(list).toHaveLength(CHOICES);
+                expect(new Set(list.map(k => k.kanji)).size).toBe(CHOICES);
+                for (const k of list) {
+                    expect(k.grade).toBeLessThanOrEqual(grade);
+                    expect(used.has(k.kanji)).toBe(false);
+                    expect(recent).not.toContain(k.kanji);
+                }
+                if (grade >= 2 || i < 2) expect(list.map(k => spellGroup(k.kanji)).sort(), `${grade} ${i}`).toEqual(['fire', 'water', 'wood']);
+                // The child writes one of them
+                used.add(list[i % 3].kanji);
+                recent = pushRecent(recent, list[i % 3].kanji);
+            }
+        }
+    });
+
+    it('when an element has no kanji left, one of another group comes', () => {
+        const fire = kanjiDatabase.filter(k => k.grade === 1 && spellGroup(k.kanji) === 'fire').map(k => k.kanji);
+        const list = pickChoices(opts({ used: new Set(fire), progress: played() }), spellGroup);
+        expect(list).toHaveLength(CHOICES);
+        expect(list.some(k => spellGroup(k.kanji) === 'fire')).toBe(false);
+        expect(new Set(list.map(k => spellGroup(k.kanji))).size).toBe(3);
+    });
+
+    it('the first 3 questions of the 1st grade are easy ones (5 strokes or fewer) where it can', () => {
+        const list = pickChoices(opts({ random: createRng('easy') }), spellGroup);
+        for (const k of list) expect(strokesOf(k.kanji), k.kanji).toBeLessThanOrEqual(EASY_STROKES);
     });
 });
 

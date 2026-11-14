@@ -80,8 +80,8 @@ describe('the pictures', () => {
     });
 
     it('the effects of the fighters draw from start to end', () => {
-        const who = { kind: 'neko' as const, form: 1 as const, side: 'ally' as const, size: 34, color: '#fff' };
-        const boss = { kind: 'boss' as const, form: 0 as const, side: 'enemy' as const, size: 72, color: '#7a2c4d' };
+        const who = { kind: 'neko' as const, form: 1 as const, side: 'ally' as const, size: 34, color: '#fff', element: 'fire' as const };
+        const boss = { kind: 'boss' as const, form: 0 as const, side: 'enemy' as const, size: 72, color: '#7a2c4d', element: null };
         for (const t of [0, 0.3, 0.8, 0.95, 1]) {
             const { ctx, count } = fakeCtx();
             drawFly(ctx, who, 500, 330, t, t * 1000);
@@ -115,7 +115,7 @@ describe('the pictures', () => {
         // Everything the pictures write on the field (no ruby on a canvas)
         const { ctx, count } = fakeCtx();
         for (const e of Object.values(ENEMIES)) for (const p of poses(0, e.color)) for (const t of [0, 1500, 3000]) ART[e.id](ctx, 72, { ...p, t });
-        for (const t of [0, 0.5]) drawFly(ctx, { kind: 'purun', form: 0, side: 'ally', size: 34, color: '#fff' }, 0, 330, t, 0);
+        for (const t of [0, 0.5]) drawFly(ctx, { kind: 'purun', form: 0, side: 'ally', size: 34, color: '#fff', element: 'water' }, 0, 330, t, 0);
         drawStomp(ctx, 0, 330, 0.1);
         drawPillowTower(ctx, 0, 330, 1, 1, 0);
         for (const w of count.texts) expect(canShow(w, 1), w).toBe(true);

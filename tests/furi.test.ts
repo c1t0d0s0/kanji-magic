@@ -4,6 +4,7 @@ import { STAGES } from '../src/game/stages';
 import { UNITS, UNIT_IDS } from '../src/game/units';
 import { bareKanji, kana, plain, segments, textFor } from '../src/learning/furi';
 import { SPELL_GROUPS } from '../src/spell/effects';
+import { ELEMENT_INFO } from '../src/spell/elements';
 
 const KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]+$/u;
 
@@ -28,7 +29,7 @@ describe('furigana', () => {
         const texts = [
             ...STAGES.map(s => s.name),
             ...UNIT_IDS.flatMap(id => [UNITS[id].role, ...UNITS[id].forms.map(f => f.name)]),
-            ...Object.values(SPELL_GROUPS).flatMap(g => [g.name, g.does])
+            ...Object.values(SPELL_GROUPS).flatMap(g => [g.name, g.does]), ...Object.values(ELEMENT_INFO).map(e => e.name)
         ];
         for (const t of texts) {
             expect(bareKanji(t), t).toEqual([]);
@@ -53,7 +54,7 @@ describe('furigana', () => {
     });
 
     it('no kanji at all in the magic circle and the practice page (they would give the answer away)', () => {
-        for (const f of ['src/components/SpellOverlay.vue', 'src/components/SpellPrompt.vue', 'src/practice/PracticeApp.vue']) {
+        for (const f of ['src/components/SpellOverlay.vue', 'src/components/SpellChoice.vue', 'src/components/SpellPrompt.vue', 'src/practice/PracticeApp.vue']) {
             expect(kana(template(f)).match(/\p{Script=Han}/gu), f).toBeNull();
         }
     });

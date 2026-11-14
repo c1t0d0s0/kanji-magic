@@ -3,10 +3,19 @@
 // The battle chooses the kanji with learning/picker.ts and asks it with questionFor
 import { kanjiDatabase, type KanjiItem } from '../vendor/kanji-quiz/src/data/kanji';
 import { reibunList, type Reibun } from '../vendor/kanji-quiz/src/data/reibun';
+import type { SpellGroup } from './effects';
 
 export interface Question {
     item: KanjiItem;
     reibun: Reibun;
+}
+
+// One of the 3 kanji to choose from before the magic circle (components/SpellChoice.vue)
+export interface Choice {
+    question: Question;
+    group: SpellGroup;
+    // How well it would work on the enemies there now (game/battle.ts spellRating)
+    rating: 'good' | 'normal' | 'weak' | 'none';
 }
 
 // The kanji asked last are left out (the list is changed: the new kanji goes in it)

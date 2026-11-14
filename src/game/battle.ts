@@ -4,12 +4,13 @@
 // play whole stages). Our base is on the right, the enemy's on the left; our units go left.
 // What happens for the sound and the pictures is told by `events` (emptied by the screen) and `fx`.
 import {
-    BOSS_SPELL_RESIST, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
+    BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
 } from '../config';
 import type { SpellEffect, SpellGroup } from '../spell/effects';
+import { ELEMENTS, affinity, type Element } from '../spell/elements';
 import type { SpellGrade } from '../spell/grade';
-import { ENEMIES, type EnemyId } from './enemies';
-import type { Stage } from './stages';
+import { ELEMENT_BODY, ENEMIES, type EnemyId } from './enemies';
+import type { Spawn, Stage } from './stages';
 import { formOf, unitStats, type UnitId } from './units';
 
 export type Side = 'ally' | 'enemy';
@@ -20,6 +21,11 @@ export interface Fighter {
     kind: UnitId | EnemyId;
     // The evolution (0 for the enemies): only for the picture
     form: 0 | 1 | 2;
+    // 炎・水・木 or none: the hits between two of them are stronger or weaker (spell/elements.ts)
+    element: Element | null;
+    // The element changes every BOSS_ELEMENT_MS (the last boss); ms since it came
+    cycle?: boolean;
+    age?: number;
     color: string;
     size: number;
     boss: boolean;
@@ -46,8 +52,10 @@ export interface Fighter {
     mana: number;
 }
 
-// fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes
-export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'fizzle' | 'perfect';
+// fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
+// spark: a hit on the element it beats; good / weak: a spell that worked well / not well on most;
+// change: the boss changed its element
+export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect';
 
 // Who made it (for the picture only)
 export interface FxWho {
@@ -56,6 +64,7 @@ export interface FxWho {
     side: Side;
     size: number;
     color: string;
+    element: Element | null;
 }
 
 export interface Fx {
@@ -67,7 +76,7 @@ export interface Fx {
     who?: FxWho;
 }
 
-const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color });
+const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element });
 
 export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose';
 
@@ -166,7 +175,7 @@ export function summon(b: Battle, id: UnitId) {
     b.money -= s.cost;
     b.cooldowns[id] = s.cooldownMs;
     b.fighters.push({
-        id: b.nextId++, side: 'ally', kind: id, form: formOf(d.level), color: s.form.color, size: s.size, boss: false,
+        id: b.nextId++, side: 'ally', kind: id, form: formOf(d.level), element: s.element, color: s.form.color, size: s.size, boss: false,
         x: LANE.allyBase - s.size / 2, hp: s.hp, maxHp: s.hp, attack: s.attack, attackMs: s.attackMs, range: s.range,
         speed: s.speed, knockback: s.knockback, area: s.area, wait: s.attackMs * 0.3, stopMs: 0,
         shield: b.shieldMs > 0 ? b.shieldAmount : 0, hurtMs: 0, fighting: false, money: 0, mana: 0
@@ -176,12 +185,15 @@ export function summon(b: Battle, id: UnitId) {
     return true;
 }
 
-function spawnEnemy(b: Battle, id: EnemyId) {
+function spawnEnemy(b: Battle, rule: Spawn) {
+    const id: EnemyId = rule.enemy;
     const e = ENEMIES[id];
+    const cycle = rule.element === 'cycle';
+    const element: Element | null = rule.element === 'cycle' ? ELEMENTS[0] : rule.element ?? null;
     const p = b.stage.power;
     const hp = Math.round(e.hp * p);
     b.fighters.push({
-        id: b.nextId++, side: 'enemy', kind: id, form: 0, color: e.color, size: e.size, boss: e.boss,
+        id: b.nextId++, side: 'enemy', kind: id, form: 0, element, cycle, age: 0, color: element ? ELEMENT_BODY[element] : e.color, size: e.size, boss: e.boss,
         x: LANE.enemyBase + e.size / 2, hp, maxHp: hp, attack: Math.round(e.attack * p), attackMs: e.attackMs, range: e.range,
         speed: e.speed, knockback: 0, area: false, wait: e.attackMs * 0.3, stopMs: 0, shield: 0, hurtMs: 0, fighting: false,
         money: e.money, mana: e.mana
@@ -222,15 +234,20 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
         return;
     }
     switch (effect.kind) {
-        case 'damage':
-            for (const f of enemies(b)) harm(f, effect.damage * resist(f));
+        case 'attack': {
+            let good = 0, weak = 0;
+            for (const f of enemies(b)) {
+                const k = affinity(effect.element, f.element, 'spell');
+                if (k > 1) good++;
+                if (k < 1) weak++;
+                harm(f, effect.damage * k * resist(f));
+                if (effect.push) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
+                if (effect.stopMs) f.stopMs = Math.max(f.stopMs, effect.stopMs * resist(f));
+            }
+            if (good > weak) b.fx.push({ kind: 'good', x: middle, ms: 0, total: 1400 });
+            else if (weak > good) b.fx.push({ kind: 'weak', x: middle, ms: 0, total: 1400 });
             break;
-        case 'push':
-            for (const f of enemies(b)) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
-            break;
-        case 'stop':
-            for (const f of enemies(b)) f.stopMs = Math.max(f.stopMs, effect.ms * resist(f));
-            break;
+        }
         case 'shield':
             b.shieldMs = effect.ms;
             b.shieldAmount = effect.shield;
@@ -241,9 +258,23 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
             b.boostRate = effect.rate;
             break;
     }
-    const total = effect.kind === 'stop' || effect.kind === 'shield' || effect.kind === 'boost' ? Math.min(effect.ms, 3000) : 1500;
+    const total = effect.kind === 'shield' || effect.kind === 'boost' ? Math.min(effect.ms, 3000) : effect.stopMs ? Math.min(effect.stopMs, 3000) : 1500;
     b.fx.push({ kind: effect.group, x: middle, ms: 0, total });
     if (grade === 'perfect') b.fx.push({ kind: 'perfect', x: middle, ms: 0, total: 1500 });
+}
+
+// How well a spell of this element would work on the enemies there now (their hp weighs):
+// the mean of the affinity. 'none': no enemy to hurt (or a spell that does not hurt)
+export function spellRating(b: Battle, element: Element | null): 'good' | 'normal' | 'weak' | 'none' {
+    const list = enemies(b);
+    let hp = 0, sum = 0;
+    for (const f of list) {
+        hp += f.hp;
+        sum += f.hp * affinity(element, f.element, 'spell');
+    }
+    if (hp <= 0) return 'none';
+    const mean = sum / hp;
+    return mean >= 1.5 ? 'good' : mean <= 0.75 ? 'weak' : 'normal';
 }
 
 // --- One step of the battle ---
@@ -289,13 +320,18 @@ function fight(b: Battle, f: Fighter, dt: number) {
     // Something thrown, to be seen flying (it hits at once all the same)
     if (f.range > 100) b.fx.push({ kind: 'shot', x: f.x, to: foeInReach && foe ? foe.x : baseX, ms: 0, total: 350, who: whoOf(f) });
     const power = ally && b.boostMs > 0 ? f.attack * b.boostRate : f.attack;
-    if (foeInReach && foe) {
+    // At the base, the base first: the enemies that keep coming out of it would else hold back the
+    // units that got there for ever
+    const baseInReach = toBase <= f.range;
+    if (foeInReach && foe && !baseInReach) {
         const hit = f.area
             ? b.fighters.filter(o => o.side !== f.side && o.hp > 0 && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range)
             : [foe];
         if (f.area) b.fx.push({ kind: 'stomp', x: f.x, ms: 0, total: 450, who: whoOf(f) });
         for (const o of hit) {
-            harm(o, power);
+            const k = affinity(f.element, o.element, 'unit');
+            harm(o, power * k);
+            if (k > 1) b.fx.push({ kind: 'spark', x: o.x, ms: 0, total: 300, who: whoOf(o) });
             if (f.knockback > 0) {
                 const back = f.knockback * (o.boss ? 0.25 : 1);
                 o.x = ally ? Math.max(LANE.enemyBase + o.size / 2, o.x - back) : Math.min(LANE.allyBase - o.size / 2, o.x + back);
@@ -330,11 +366,19 @@ export function step(b: Battle, dt: number) {
     b.stage.spawns.forEach((rule, i) => {
         const count = rule.count ?? Infinity;
         while (b.spawned[i] < count && b.time >= (rule.from + b.spawned[i] * rule.every) * 1000) {
-            spawnEnemy(b, rule.enemy);
+            spawnEnemy(b, rule);
             b.spawned[i]++;
         }
     });
 
+    for (const f of b.fighters) {
+        if (!f.cycle) continue;
+        const before = f.element;
+        f.age = (f.age ?? 0) + dt;
+        f.element = ELEMENTS[Math.floor(f.age / BOSS_ELEMENT_MS) % ELEMENTS.length];
+        if (f.element) f.color = ELEMENT_BODY[f.element];
+        if (f.element !== before) b.fx.push({ kind: 'change', x: f.x, ms: 0, total: 1500, who: whoOf(f) });
+    }
     for (const f of b.fighters) if (f.hp > 0) fight(b, f, dt);
 
     for (const f of b.fighters) {

@@ -8,21 +8,22 @@
 import Furi from '../components/Furi.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue';
 import SpellOverlay from '../components/SpellOverlay.vue';
+import SpellChoice from '../components/SpellChoice.vue';
 import MuteButton from '../components/MuteButton.vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
 import { LANE, MANA_MAX, SPELL_SLOW } from '../config';
 import {
-    canSummon, canUpgradeWallet, castSpell, createBattle, manaFull, starsOf, startSpell, step, summon, upgradeWallet, walletOf, type BattleEvent
+    canSummon, canUpgradeWallet, castSpell, spellRating, createBattle, manaFull, starsOf, startSpell, step, summon, upgradeWallet, walletOf, type BattleEvent
 } from '../game/battle';
 import { createLoop } from '../game/loop';
 import { drawBattle, FIELD_HEIGHT } from '../game/render';
 import { stageById } from '../game/stages';
 import { formOf, unitStats, type UnitId } from '../game/units';
 import { plain } from '../learning/furi';
-import { pickKanji } from '../learning/picker';
-import { spellEffect, spellGroup } from '../spell/effects';
+import { pickChoices } from '../learning/picker';
+import { elementOfGroup, spellEffect, spellGroup } from '../spell/effects';
 import type { SpellOutcome } from '../spell/grade';
-import { questionFor, type Question } from '../spell/question';
+import { questionFor, type Choice, type Question } from '../spell/question';
 import { loadTegaki, type TegakiKit } from '../spell/tegaki';
 import { play, unlockAudio, type SoundName } from '../sound';
 import { finishBattle, go, progress, recordOutcome, save, ui } from '../store';
@@ -34,6 +35,8 @@ const deck = save.deck.map(id => unitStats(id, save.units[id]));
 const kit = shallowRef<TegakiKit | null>(null);
 const loadFailed = ref(false);
 const question = shallowRef<Question | null>(null);
+// The 3 kanji to choose from, before the magic circle
+const choices = shallowRef<Choice[] | null>(null);
 const spells: SpellOutcome[] = [];
 const used = new Set<string>();
 const paused = ref(false);
@@ -106,7 +109,7 @@ function draw() {
     }
     hud.result = battle.result;
     if (tutorial.value === 'fight' && hud.manaFull && kit.value) tutorial.value = 'magic';
-    if (battle.result && !question.value && !finishing) end();
+    if (battle.result && !question.value && !choices.value && !finishing) end();
 }
 
 const loop = createLoop(dt => step(battle, dt), draw);
@@ -128,20 +131,33 @@ function strokesOf(kanji: string) {
 
 function magic() {
     unlockAudio();
-    if (!kit.value || question.value || !startSpell(battle)) return;
-    const item = pickKanji({
+    if (!kit.value || question.value || choices.value || !startSpell(battle)) return;
+    const items = pickChoices({
         grade: save.settings.grade,
         only: save.settings.only,
         progress,
         recent: save.recent,
         used,
         strokesOf
+    }, spellGroup);
+    choices.value = items.map(item => {
+        const group = spellGroup(item.kanji);
+        const element = elementOfGroup(group);
+        const rating = group === 'metal' || group === 'word' ? 'none' : element ? spellRating(battle, element) : 'normal';
+        return { question: questionFor(item), group, rating };
     });
-    used.add(item.kanji);
-    question.value = questionFor(item);
     loop.timeScale = SPELL_SLOW;
     play('open');
     if (tutorial.value === 'magic') tutorial.value = null;
+}
+
+// A card chosen: the magic circle opens with its kanji
+function chosen(i: number) {
+    const c = choices.value?.[i];
+    choices.value = null;
+    if (!c) return closed();
+    used.add(c.question.item.kanji);
+    question.value = c.question;
 }
 
 // The spell is judged: it goes off now (the battle still slow behind the circle)
@@ -215,7 +231,7 @@ async function load() {
 
 // The hidden page (another app): the battle waits
 function onVisibility() {
-    if (document.hidden && !paused.value && !question.value && !battle.result) pause();
+    if (document.hidden && !paused.value && !question.value && !choices.value && !battle.result) pause();
 }
 
 onMounted(() => {
@@ -263,7 +279,7 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
                     <span class="mana-text"><Furi text="[魔力|まりょく]" /> {{ Math.floor(hud.mana * 100) }}%</span>
                 </div>
                 <div class="pointer-anchor">
-                    <button type="button" class="btn magic-btn" :class="{ 'is-full': hud.manaFull && kit }" :disabled="!kit || !hud.manaFull || !!question" @click="magic">
+                    <button type="button" class="btn magic-btn" :class="{ 'is-full': hud.manaFull && kit }" :disabled="!kit || !hud.manaFull || !!question || !!choices" @click="magic">
                         <Furi :text="kit ? '[魔法|まほう]' : '[準備中|じゅんびちゅう]'" />
                     </button>
                     <span v-if="tutorial === 'magic'" class="pointer" aria-hidden="true">👆</span>
@@ -294,6 +310,7 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
             </div>
         </dialog>
 
+        <SpellChoice v-if="choices" :choices="choices" @pick="chosen" />
         <SpellOverlay v-if="question && kit" :kit="kit" :question="question"
             :settings="{ strokeOrder: save.settings.strokeOrder, trace: save.settings.trace }" @judged="judged" @done="closed" />
     </main>

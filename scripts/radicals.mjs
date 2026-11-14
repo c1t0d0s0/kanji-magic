@@ -1,4 +1,5 @@
-// Makes src/spell/radicals.ts (the radical of each of the 1,026 kanji) from a release of KanjiVG.
+// Makes src/spell/radicals.ts (the radical of each of the 1,026 kanji, and the parts it is made of)
+// from a release of KanjiVG.
 // Usage: npm run radicals            (downloads the release kanji-quiz took its strokes from)
 //        npm run radicals -- file.xml.gz
 // The release is read from src/vendor/kanji-quiz/scripts/kanjivg.mjs, so the radicals come from
@@ -34,6 +35,7 @@ const attr = (tag, name) => tag.match(new RegExp(`kvg:${name}="([^"]*)"`))?.[1];
 const xml = gunzipSync(await load()).toString('utf8');
 const header = xml.match(/<!--([\s\S]*?)-->/)[1].trim();
 const radicals = {};
+const components = {};
 const missing = [];
 for (const kanji of kanjiList) {
     const code = kanji.codePointAt(0).toString(16).padStart(5, '0');
@@ -49,13 +51,18 @@ for (const kanji of kanjiList) {
     const radical = best && (attr(best, 'element') ?? attr(best, 'original'));
     if (!radical) missing.push(kanji);
     else radicals[kanji] = radical;
+    // Every part KanjiVG names in it (炎: 火; 談: 言 炎 火), the kanji itself left out
+    const parts = block ? [...block[1].matchAll(/kvg:element="([^"]*)"/g)].map(m => m[1]) : [];
+    components[kanji] = [...new Set(parts.flatMap(p => [...p]))].filter(p => p !== kanji).join('');
 }
 if (missing.length) throw new Error(`No radical in KanjiVG: ${missing.join('')}`);
 
 const body = Object.entries(radicals).map(([k, r]) => `    ${k}: '${r}'`).join(',\n');
+const partsBody = Object.entries(components).map(([k, p]) => `    ${k}: '${p}'`).join(',\n');
 writeFileSync(out, `// The radical of each of the 1,026 kanji, made by scripts/radicals.mjs (npm run radicals) from
 // KanjiVG ${RELEASE} (https://kanjivg.tagaini.net), the release the strokes of kanji-quiz come from.
-// Do not edit by hand. The radical is written as it looks in the kanji (氵 for 海, 灬 for 点).
+// Do not edit by hand. The radical is written as it looks in the kanji (氵 for 海, 灬 for 点);
+// components are all the parts KanjiVG names in each kanji, as one string.
 //
 // This file is a work based on KanjiVG and is distributed under the same licence (CC BY-SA 3.0),
 // unlike the rest of this repository (MIT). The notice of KanjiVG:
@@ -64,6 +71,10 @@ ${header}
 */
 export const radicals: Record<string, string> = {
 ${body}
+};
+
+export const components: Record<string, string> = {
+${partsBody}
 };
 `);
 console.log(`${Object.keys(radicals).length} kanji, ${new Set(Object.values(radicals)).size} radicals → ${out}`);

@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET } from '../src/config';
+import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET } from '../src/config';
 import {
-    canSummon, castSpell, createBattle, manaFull, rewardOf, starsOf, startSpell, step, summon, upgradeWallet, type Battle
+    canSummon, castSpell, createBattle, manaFull, rewardOf, spellRating, starsOf, startSpell, step, summon, upgradeWallet, type Battle
 } from '../src/game/battle';
 import { ENEMIES } from '../src/game/enemies';
 import { STAGES, stageById, type Stage } from '../src/game/stages';
 import { UNITS, formOf, levelPower, unitStats, unlockedUnits } from '../src/game/units';
 import { spellEffect } from '../src/spell/effects';
+import type { Element } from '../src/spell/elements';
 import { autoplay } from './helpers/autoplay';
 
 const DT = 1000 / 60;
@@ -15,10 +16,10 @@ const run = (b: Battle, ms: number) => {
 };
 // A stage with no enemies, to test one thing at a time
 const quiet: Stage = { id: 99, name: 'test', power: 1, enemyBaseHp: 1000, allyBaseHp: 1000, reward: 10, spawns: [] };
-const enemyAt = (b: Battle, x: number, id: keyof typeof ENEMIES = 'zako') => {
+const enemyAt = (b: Battle, x: number, id: keyof typeof ENEMIES = 'zako', element: Element | null = null) => {
     const e = ENEMIES[id];
     b.fighters.push({
-        id: b.nextId++, side: 'enemy', kind: id, form: 0, color: e.color, size: e.size, boss: e.boss, x, hp: e.hp, maxHp: e.hp,
+        id: b.nextId++, side: 'enemy', kind: id, form: 0, element, color: e.color, size: e.size, boss: e.boss, x, hp: e.hp, maxHp: e.hp,
         attack: e.attack, attackMs: e.attackMs, range: e.range, speed: e.speed, knockback: 0, area: false, wait: 0, stopMs: 0,
         shield: 0, hurtMs: 0, fighting: false, money: e.money, mana: e.mana
     });
@@ -136,7 +137,7 @@ describe('the magic', () => {
         const a = enemyAt(b, 300, 'hard'), c = enemyAt(b, 600, 'hard'), boss = enemyAt(b, 400, 'boss');
         const e = spellEffect('火', 'success', 4)!;
         castSpell(b, e, 'success');
-        const dmg = e.kind === 'damage' ? e.damage : 0;
+        const dmg = e.kind === 'attack' ? e.damage : 0;
         expect(a.maxHp - a.hp).toBe(dmg);
         expect(c.maxHp - c.hp).toBe(dmg);
         expect(boss.maxHp - boss.hp).toBe(dmg / 2);
@@ -144,16 +145,18 @@ describe('the magic', () => {
 
     it('みず pushes the enemies back to their side', () => {
         const b = createBattle(quiet, []);
-        const e = enemyAt(b, 600);
+        const e = enemyAt(b, 600, 'hard');
         castSpell(b, spellEffect('海', 'success', 9), 'success');
+        expect(e.hp).toBeLessThan(e.maxHp);
         expect(e.x).toBeLessThan(600);
         expect(e.x).toBeGreaterThanOrEqual(LANE.enemyBase);
     });
 
     it('き stops the enemies for a while', () => {
         const b = createBattle(quiet, []);
-        const e = enemyAt(b, 300);
+        const e = enemyAt(b, 300, 'hard');
         castSpell(b, spellEffect('森', 'success', 12), 'success');
+        expect(e.hp).toBeLessThan(e.maxHp);
         run(b, 2000);
         expect(e.x).toBe(300);
         run(b, 10000);
@@ -192,12 +195,12 @@ describe('a whole stage (a simple player)', () => {
     // Levels a child may have reached at each stage
     const levelAt = (id: number) => 1 + Math.floor((id - 1) / 2);
 
-    it('each stage is won with spells that succeed, in 1 to 5 minutes', () => {
+    it('each stage is won with spells that succeed, chosen by the elements, in 1 to 6 minutes', () => {
         for (const s of STAGES) {
             const b = autoplay(s, { spell: 'success', level: levelAt(s.id) });
             expect(b.result, `stage ${s.id}`).toBe('win');
             expect(b.time, `stage ${s.id}`).toBeGreaterThan(55000);
-            expect(b.time, `stage ${s.id}`).toBeLessThan(300000);
+            expect(b.time, `stage ${s.id}`).toBeLessThan(360000);
         }
     }, 120000);
 
@@ -205,9 +208,18 @@ describe('a whole stage (a simple player)', () => {
         for (const s of STAGES) expect(autoplay(s, { spell: null, level: 1, idle: true }).result, `stage ${s.id}`).toBe('lose');
     }, 60000);
 
-    it('the later stages need the magic', () => {
-        const without = STAGES.filter(s => s.id >= 7).map(s => autoplay(s, { spell: null, level: levelAt(s.id) }).result);
+    it('the last stages need the magic', () => {
+        const without = STAGES.filter(s => s.id >= 8).map(s => autoplay(s, { spell: null, level: levelAt(s.id) }).result);
         expect(without.every(r => r !== 'win')).toBe(true);
+    }, 120000);
+
+    it('choosing by the elements wins the later stages sooner (or at all)', () => {
+        for (const s of STAGES.filter(st => st.id >= 5 && st.id <= 9)) {
+            const best = autoplay(s, { spell: 'success', choose: 'best', level: levelAt(s.id) });
+            const worst = autoplay(s, { spell: 'success', choose: 'worst', level: levelAt(s.id) });
+            expect(best.result, `stage ${s.id}`).toBe('win');
+            if (worst.result === 'win') expect(best.time, `stage ${s.id}`).toBeLessThan(worst.time * 0.9);
+        }
     }, 120000);
 
     it('the same battle plays the same way', () => {
@@ -215,6 +227,62 @@ describe('a whole stage (a simple player)', () => {
         const b = autoplay(stageById(3), { spell: 'success', level: 2 });
         expect(a.time).toBe(b.time);
         expect(a.allyBase.hp).toBe(b.allyBase.hp);
+    });
+});
+
+describe('the elements', () => {
+    it('a spell hurts ×2 the element it beats, ×0.5 the one that beats it; no element ×1', () => {
+        const b = createBattle(quiet, []);
+        const fire = enemyAt(b, 300, 'boss', 'fire'), wood = enemyAt(b, 400, 'boss', 'wood'), water = enemyAt(b, 500, 'boss', 'water'), none = enemyAt(b, 600, 'boss');
+        const e = spellEffect('海', 'success', 9)!;
+        castSpell(b, e, 'success');
+        const dmg = (e.kind === 'attack' ? e.damage : 0) * BOSS_SPELL_RESIST;
+        expect(fire.maxHp - fire.hp).toBeCloseTo(dmg * AFFINITY.spell.strong);
+        expect(wood.maxHp - wood.hp).toBeCloseTo(dmg * AFFINITY.spell.weak);
+        expect(water.maxHp - water.hp).toBeCloseTo(dmg);
+        expect(none.maxHp - none.hp).toBeCloseTo(dmg);
+        expect(b.fx.some(f => f.kind === 'good')).toBe(false);
+    });
+
+    it('says よく きいた！ when most were of the element it beats', () => {
+        const b = createBattle(quiet, []);
+        enemyAt(b, 300, 'boss', 'wood');
+        enemyAt(b, 400, 'boss', 'wood');
+        enemyAt(b, 500, 'boss', 'water');
+        // Before: how the cards would show it
+        expect(spellRating(b, 'fire')).toBe('good');
+        expect(spellRating(b, 'water')).toBe('weak');
+        castSpell(b, spellEffect('火', 'success', 4), 'success');
+        expect(b.fx.some(f => f.kind === 'good')).toBe(true);
+    });
+
+    it('a unit hurts more the element it beats, and is hurt more by the one that beats it', () => {
+        const hit = (unitEl: 'water' | 'wood', foeEl: Element | null) => {
+            const b = createBattle(quiet, [{ id: unitEl === 'water' ? 'kaba' : 'kaeru', level: 1 }]);
+            b.money = 5000;
+            summon(b, unitEl === 'water' ? 'kaba' : 'kaeru');
+            const u = b.fighters[0];
+            const e = enemyAt(b, u.x - u.size / 2 - 30, 'boss', foeEl);
+            e.attack = 0;
+            run(b, 3000);
+            return e.maxHp - e.hp;
+        };
+        expect(hit('water', 'fire')).toBeCloseTo(hit('water', null) * AFFINITY.unit.strong);
+        expect(hit('water', 'wood')).toBeCloseTo(hit('water', null) * AFFINITY.unit.weak);
+        expect(UNITS.kaba.element).toBe('water');
+    });
+
+    it('the last boss changes its element every BOSS_ELEMENT_MS', () => {
+        const b = createBattle({ ...quiet, spawns: [{ enemy: 'boss', element: 'cycle', from: 0, every: 1, count: 1 }] }, []);
+        step(b, DT);
+        const boss = b.fighters[0];
+        const seen = [boss.element];
+        for (let i = 0; i < 2; i++) {
+            run(b, BOSS_ELEMENT_MS);
+            seen.push(boss.element);
+        }
+        expect(new Set(seen).size).toBe(3);
+        expect(b.fx.some(f => f.kind === 'change')).toBe(true);
     });
 });
 

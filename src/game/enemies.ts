@@ -26,3 +26,6 @@ export const ENEMIES: Record<EnemyId, EnemyType> = {
     thrower: { id: 'thrower', name: 'ぽいぽいわすれ', color: '#9bb6c9', hp: 120, attack: 18, attackMs: 1800, range: 200, speed: 24, size: 34, money: 35, mana: 8, boss: false },
     boss: { id: 'boss', name: 'おおわすれんぼう', color: '#7a2c4d', hp: 3200, attack: 60, attackMs: 2400, range: 60, speed: 12, size: 72, money: 300, mana: 40, boss: true }
 };
+
+// The colour of an enemy of an element (the shape is that of its kind)
+export const ELEMENT_BODY = { fire: '#ff9a76', water: '#82b9ff', wood: '#93d16d' } as const;

@@ -2,6 +2,7 @@
 // The pictures are drawn by src/art/characters.ts, by the id and the form (0, 1, 2); the colour of
 // a form is its main colour there.
 import { EVOLVE_AT, EVOLVE_BONUS, LEVEL_GROWTH, MAX_LEVEL } from '../config';
+import type { Element } from '../spell/elements';
 
 export type UnitId = 'purun' | 'kaeru' | 'neko' | 'pengin' | 'kaba';
 
@@ -14,6 +15,8 @@ export interface UnitType {
     id: UnitId;
     // What it is for (with [kanji|reading] marks, as the names: learning/furi.ts)
     role: string;
+    // Its attacks hurt more the enemies of the element this one beats (spell/elements.ts)
+    element: Element;
     cost: number;
     // Before the same unit can be sent again
     cooldownMs: number;
@@ -38,7 +41,7 @@ export interface UnitType {
 
 export const UNITS: Record<UnitId, UnitType> = {
     purun: {
-        id: 'purun', role: '[壁|かべ]', cost: 50, cooldownMs: 2000, hp: 260, attack: 8, attackMs: 1200, range: 28, speed: 32,
+        id: 'purun', element: 'water', role: '[壁|かべ]', cost: 50, cooldownMs: 2000, hp: 260, attack: 8, attackMs: 1200, range: 28, speed: 32,
         knockback: 0, area: false, size: 34, unlockAfter: 0,
         forms: [
             { name: 'ぷるりん', color: '#7fd0f2' },
@@ -47,7 +50,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     kaeru: {
-        id: 'kaeru', role: '[近|ちか]く', cost: 150, cooldownMs: 4000, hp: 220, attack: 32, attackMs: 1000, range: 32, speed: 36,
+        id: 'kaeru', element: 'wood', role: '[近|ちか]く', cost: 150, cooldownMs: 4000, hp: 220, attack: 32, attackMs: 1000, range: 32, speed: 36,
         knockback: 0, area: false, size: 36, unlockAfter: 0,
         forms: [
             { name: '[眉毛|まゆげ]ガエル', color: '#7ccf5a' },
@@ -56,7 +59,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     neko: {
-        id: 'neko', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 150, attack: 40, attackMs: 1600, range: 240, speed: 30,
+        id: 'neko', element: 'fire', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 150, attack: 40, attackMs: 1600, range: 240, speed: 30,
         knockback: 0, area: false, size: 34, unlockAfter: 2,
         forms: [
             { name: 'ヒゲ[長|なが]ネコ', color: '#f6b25a' },
@@ -65,7 +68,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     pengin: {
-        id: 'pengin', role: '[速|はや]い', cost: 400, cooldownMs: 7000, hp: 240, attack: 45, attackMs: 900, range: 44, speed: 80,
+        id: 'pengin', element: 'fire', role: '[速|はや]い', cost: 400, cooldownMs: 7000, hp: 240, attack: 45, attackMs: 900, range: 44, speed: 80,
         knockback: 40, area: false, size: 36, unlockAfter: 4,
         forms: [
             { name: 'ローラーペンギン', color: '#3a4a6a' },
@@ -74,7 +77,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     kaba: {
-        id: 'kaba', role: '[重|おも]い', cost: 600, cooldownMs: 12000, hp: 900, attack: 70, attackMs: 2200, range: 70, speed: 18,
+        id: 'kaba', element: 'water', role: '[重|おも]い', cost: 600, cooldownMs: 12000, hp: 900, attack: 70, attackMs: 2200, range: 70, speed: 18,
         knockback: 0, area: true, size: 48, unlockAfter: 6,
         forms: [
             { name: 'どすこいカバ', color: '#b7a6c9' },

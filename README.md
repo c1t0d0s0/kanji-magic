@@ -23,9 +23,11 @@ Google タグを埋め込むときは、`config.example.js` を `config.js` に�
 - `src/vendor/kanji-quiz/`：kanji-quiz から**中身を変えずに**コピーしたファイル（判定エンジン・KanjiVG のデータ・配当表・例文・WritingPad・ModelStrokes）。どのコミットから取ったかと更新の手順は [VENDOR.md](src/vendor/kanji-quiz/VENDOR.md) にあります
 - `src/spell/tegaki.ts`：判定エンジンと KanjiVG データの遅延読み込み、つまずきを子どもに伝える文言
 - `src/spell/grade.ts`：`judge` を2回（書き順あり・なし）呼んで、かんぺき／せいこう／おしい／ふはつに分ける
-- `src/spell/effects.ts`：部首 → 魔法のグループ（ほのお・みず・き・かね・ことば・ふしぎ）と、その効果と威力
-- `src/spell/radicals.ts`：1,026字の部首。`scripts/radicals.mjs` が KanjiVG から作る（手で直さない）
+- `src/spell/effects.ts`：漢字 → 魔法のグループ（炎・水・木・金・言葉・不思議）と、その効果と威力
+- `src/spell/radicals.ts`：1,026字の部首（`radicals`）と部品（`components`）。`scripts/radicals.mjs` が KanjiVG から作る（手で直さない）
+- `src/spell/elements.ts`：漢字の属性（炎・水・木。部首 → 部品 → 意味の表の順に決める）と、相性の倍率
 - `src/spell/timer.ts`・`src/spell/question.ts`：書く時間（10〜30秒）と、出題（例文の□）
+- `src/components/SpellChoice.vue`：魔法陣の前の3択（属性のマーク・読み・いまの敵への効き目）
 - `src/components/SpellOverlay.vue`：魔法陣。制限時間・ルーンの光・自動の発動・お手本の表示・なぞりモード
 - `src/config.ts`：調整用の定数（`PERFECT_MARGIN`・制限時間・魔法の基本値・お金・魔力・レベル・報酬など）
 - `src/game/`：バトル本体（Vue に依存しない）。`battle.ts`（状態と1ステップの処理）・`loop.ts`（60Hz の固定ステップ）・`render.ts`（Canvas への描画）・`units.ts`・`enemies.ts`・`stages.ts`（10ステージのデータ）

@@ -29,17 +29,27 @@ export const PERFECT_SHOW_MS = 1500;
 // --- The spells (spell/effects.ts) ---
 // Power = base × SPELL_MULTIPLIER × (1 + strokes × STROKE_BONUS): a kanji of many strokes is stronger
 export const STROKE_BONUS = 0.05;
-// The base of each group. What the power makes larger: the damage (ほのお, ふしぎ), how far the
-// enemies are pushed back (みず, in px of the lane), how long they stop (き), how much harm the
-// shield takes (かね) and how much the attack grows (ことば: 0.5 → ×1.5)
+// The base of each group. 炎・水・木 and ふしぎ hurt every enemy (by the elements: AFFINITY); 水 pushes
+// them back too (px of the lane), 木 stops them (ms). かね: the harm the shield takes; ことば: how
+// much the attack grows (0.5 → ×1.5). The power makes all of these larger but the times of かね・ことば
 export const SPELL_BASE = {
-    fire: { damage: 300 },
-    water: { push: 160 },
-    wood: { ms: 5000 },
+    fire: { damage: 340 },
+    water: { damage: 240, push: 140 },
+    wood: { damage: 240, ms: 4000 },
     metal: { shield: 200, ms: 10000 },
     word: { boost: 0.5, ms: 10000 },
-    wonder: { damage: 180 }
+    wonder: { damage: 200 }
 } as const;
+
+// The elements (spell/elements.ts): ×strong on the element it beats, ×weak on the one that beats it
+export const AFFINITY = {
+    spell: { strong: 2, weak: 0.5 },
+    unit: { strong: 2, weak: 0.5 }
+} as const;
+// The 3 kanji to choose from: the time to choose (then the best one is taken)
+export const CHOICE_SECONDS = 15;
+// The boss of the last stage changes its element this often
+export const BOSS_ELEMENT_MS = 30000;
 
 // --- The battle (game/battle.ts) ---
 // The lane: the enemy base on the left, ours on the right, in px of a field 1000 wide

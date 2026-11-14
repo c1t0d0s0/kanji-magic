@@ -5,7 +5,8 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ART } from '../art/characters';
 import { restPose, type Mood } from '../art/pose';
 import type { EnemyId } from '../game/enemies';
-import { ENEMIES } from '../game/enemies';
+import { ELEMENT_BODY, ENEMIES } from '../game/enemies';
+import type { Element } from '../spell/elements';
 import { UNITS, type UnitId } from '../game/units';
 
 const props = withDefaults(defineProps<{
@@ -16,12 +17,14 @@ const props = withDefaults(defineProps<{
     animate?: boolean;
     mood?: Mood;
     walk?: boolean;
-}>(), { form: 0, size: 44, animate: false, mood: undefined, walk: false });
+    // An enemy of an element has its colour
+    element?: Element | null;
+}>(), { form: 0, size: 44, animate: false, mood: undefined, walk: false, element: null });
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let frame = 0;
 
-const colorOf = () => (props.kind in UNITS ? UNITS[props.kind as UnitId].forms[props.form].color : ENEMIES[props.kind as EnemyId].color);
+const colorOf = () => (props.kind in UNITS ? UNITS[props.kind as UnitId].forms[props.form].color : props.element ? ELEMENT_BODY[props.element] : ENEMIES[props.kind as EnemyId].color);
 
 function draw(t: number) {
     const c = canvas.value;
@@ -52,7 +55,7 @@ function start() {
 }
 
 onMounted(start);
-watch(() => [props.kind, props.form, props.size, props.animate, props.mood, props.walk], start);
+watch(() => [props.kind, props.form, props.size, props.animate, props.mood, props.walk, props.element], start);
 onBeforeUnmount(() => cancelAnimationFrame(frame));
 </script>
 
