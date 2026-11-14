@@ -1,0 +1,387 @@
+# 漢字魔法大戦争 実装要件
+
+小学1年生から6年生までが遊べる、横スクロールの拠点攻防ゲームです。ユニットを出して敵の拠点を壊すのが基本の遊びで、**出題された漢字を制限時間内に手書きすると、魔法陣が発動して必殺技が出ます**。遊んでいるうちに、漢字の「書き」と「書き順」が身につくことを狙います。
+制限時間は漢字の画数に応じて10秒から30秒の間で変化させます。
+
+手書きの判定には、[kanji-quiz](https://github.com/c1t0d0s0/kanji-quiz/)（以下 kanji-quiz）で作った KanjiVG ベースの判定エンジンを**そのまま流用します**。このゲームのために新しく判定ロジックは書きません。
+
+---
+
+## 1. 前提・方針
+
+| 項目 | 内容 |
+|---|---|
+| 対象 | 小学1〜6年生。学年は設定画面で選び、出題されるのはその学年までの配当漢字（1,026字） |
+| 動作環境 | PC / タブレット（GIGAスクール端末を含む）/ スマホのブラウザ（Chrome・Safari の最新版） |
+| 入力 | マウス・タッチ・ペン（Pointer Events で一つにまとめて扱う） |
+| サーバー | なし。静的ホスティングのみで動かす |
+| 外部API | 使わない（手書き判定もすべてブラウザ内で行う） |
+| 保存 | localStorage（ログイン不要） |
+| 課金・広告 | なし |
+
+### 1.1 1年生も遊べるようにするための方針
+- **画面の文字は漢字を使い、設定した学年でまだ習っていない漢字にはふりがな（ルビ）を付ける。** 文言は `[魔法|まほう]の [本|ほん]` のように読みを添えて書き、表示するときに学年で判断する（`src/learning/furi.ts`・`src/components/Furi.vue`）。ルビを付けられないところ（タブのタイトル・Canvas の文字）は、習っていない漢字をかなで書く。魔法陣と練習ページは、出題の答えが見えてしまわないよう、かなだけで書く。kanji-quiz の文体（「〜しよう」「〜だよ」、分かち書き）に合わせる
+- ボタンは大きくする（タップできる大きさを最低 48px 四方）
+- 最初のステージはチュートリアルにする。「ユニットを出す」「魔法をつかう」を、指さしの演出で1つずつ教える
+- 序盤のステージは、出せるユニットを2〜3種類に絞る。ユニットはステージを進めるごとに増える
+- 学年が低いほど、手書き判定を甘くする（kanji-quiz の学年別の基準をそのまま使う。6章を参照）
+
+## 2. 技術スタック
+
+kanji-quiz の部品を手を入れずに使えるよう、構成を kanji-quiz に合わせます。
+
+- Node.js 20.19 以上（推奨 24）
+- **Vue 3 + TypeScript + Vite**（kanji-quiz と同じ）
+  - メニュー・魔法陣オーバーレイ・図鑑などの UI は Vue コンポーネントで作る
+  - バトル画面は HTML5 Canvas 2D。ゲームループは自作し、`requestAnimationFrame` で固定タイムステップ（60 Hz）で回す。Vue の reactive にはバトルの状態を入れない（パフォーマンスのため）
+- テストは Vitest
+- 型チェックは `vue-tsc --noEmit`
+
+## 3. kanji-quiz から流用する部品
+
+### 3.1 流用元
+- リポジトリ：https://github.com/c1t0d0s0/kanji-quiz
+- 基準にするコミット：`85e590a00d21d18acae6298caa401375ead2e38e`（2026-11-12）
+- 流用したコミットを `src/vendor/kanji-quiz/VENDOR.md` に記録する。更新するときは、このファイルのコミットを書き換えてからコピーし直す
+
+### 3.2 コピーするファイル
+
+`src/vendor/kanji-quiz/` の下に、**元のディレクトリ構成のまま・中身を変えずに**コピーします（import のパスが壊れないようにするため）。
+
+| 元のパス | 役割 | ライセンス |
+|---|---|---|
+| `src/core/handwriting.ts` | 手書き判定エンジン（`judge` / `traceStroke` / `limitsFor` など）。依存はない | MIT |
+| `src/data/kanjivg.ts` | 1,026字の KanjiVG のストローク（書き順どおり、109×109 座標） | **CC BY-SA 3.0** |
+| `src/data/kanji.ts` | 学年別漢字配当表（漢字・読み・学年） | MIT |
+| `src/data/reibun.ts` / `reibun.txt` | 手書きの出題文（「(あか)いくつ」形式、1,026字すべてに例文あり） | MIT |
+| `src/components/WritingPad.vue` | 手書きのマス（Pointer Events・高DPI・coalesced events に対応） | MIT |
+| `src/components/ModelStrokes.vue` | お手本の表示（画の番号・まちがえた画の強調・なぞりガイド） | MIT |
+| `scripts/kanjivg.mjs` | KanjiVG のリリースから `kanjivg.ts` を作り直すスクリプト | MIT |
+| `tests/handwriting.test.ts` / `tests/helpers/scribble.ts` | 判定エンジンのテスト | MIT |
+
+- `tests/helpers/scribble.ts` は `src/core/battle.ts` の `createRng` だけを使っている。`battle.ts` はコピーせず、`createRng`（と、それが使う `hash`）だけを `src/vendor/kanji-quiz/src/core/battle.ts` として切り出す。テストからの import パスはそのまま通るようにする
+- `src/app/tegaki.ts` は Vue や他のアプリ状態への依存があるのでコピーしない。中の `loadTegaki`（遅延読み込み）・`hintMessage` / `verdictMessage`（つまずきを子どもに伝える文言）・`verdictMarks` は、同じ考え方で `src/spell/tegaki.ts` に書き直す
+- `kanji-quiz` の `LICENSE`（MIT）を `src/vendor/kanji-quiz/LICENSE` としてコピーする
+- コピーしたファイルに不具合を見つけた場合は、ここでは直さず kanji-quiz 側で直してから取り込み直す（直すまでの回避策は `src/spell/` 側に書く）
+
+### 3.3 流用するAPI（`handwriting.ts`）
+
+```ts
+// 書いた字を KanjiVG のお手本と比べる。座標の単位は何でもよい（canvas の px でよい）
+judge(writing: Stroke[], model: number[][], grade: number, options?: { strokeOrder?: boolean }): Verdict
+
+interface Verdict {
+  ok: boolean;
+  reason: 'ok' | 'empty' | 'count' | 'shape' | 'order';
+  order: { stroke: number; kind: 'order' | 'direction' } | null; // 書き順・向きのまちがい
+  hint: { kind: 'missing'|'extra'|'longer'|'shorter'|'poke'|'stop'|'place'; stroke: number; other?: number; written?: number } | null;
+  shape: number; strokes: number; worst: number; flips: number; meets: number; joins: number;
+  written: number; expected: number;
+}
+
+limitsFor(grade: number, strokes?: number): Limits  // その学年・画数での基準値
+traceStroke(written: Stroke, model: number[][], index: number, size: number): 'ok' | 'off' | 'direction' // なぞり用
+```
+
+- `grade` には**出題した漢字の配当学年**を渡す（kanji-quiz と同じ）。1年生の字は甘く、6年生の字は厳しく判定される
+- 「2画を続けて書いた」「1画を2回に分けて書いた」を、学年に応じて許す仕組み（joins）も kanji-quiz にすでにある
+
+## 4. ディレクトリ構成
+
+```
+/
+├─ src/
+│  ├─ main.ts
+│  ├─ App.vue
+│  ├─ vendor/kanji-quiz/        # 3章。中身は変えない
+│  │  ├─ VENDOR.md
+│  │  ├─ LICENSE
+│  │  ├─ src/core/handwriting.ts
+│  │  ├─ src/core/battle.ts     # createRng だけを切り出したもの
+│  │  ├─ src/data/{kanjivg,kanji,reibun}.ts, reibun.txt
+│  │  ├─ src/components/{WritingPad,ModelStrokes}.vue
+│  │  ├─ scripts/kanjivg.mjs
+│  │  └─ tests/{handwriting.test.ts, helpers/scribble.ts}
+│  ├─ game/                     # バトル本体（Vue に依存しない）
+│  │  ├─ loop.ts
+│  │  ├─ battle.ts              # 状態管理（お金・魔力・拠点HP）
+│  │  ├─ units.ts
+│  │  ├─ enemies.ts
+│  │  ├─ stages.ts
+│  │  └─ render.ts
+│  ├─ spell/                    # 必殺技（手書き）。kanji-quiz とのつなぎ
+│  │  ├─ tegaki.ts              # 遅延読み込み・文言（kanji-quiz の app/tegaki.ts にならう）
+│  │  ├─ grade.ts               # Verdict → 完璧/成功/おしい/不発
+│  │  ├─ radicals.ts            # 生成物：漢字 → 部首グループ（CC BY-SA 3.0）
+│  │  └─ effects.ts             # 部首グループ → 必殺技の効果
+│  ├─ learning/
+│  │  ├─ progress.ts
+│  │  └─ picker.ts
+│  ├─ components/
+│  │  ├─ BattleScreen.vue       # Canvas を載せる
+│  │  ├─ SpellOverlay.vue       # 魔法陣・制限時間タイマー（WritingPad と ModelStrokes を使う）
+│  │  ├─ MagicBook.vue          # 魔法書（漢字図鑑）
+│  │  └─ ...                    # タイトル・ステージ選択・編成・リザルト・設定・クレジット
+│  ├─ storage.ts
+│  └─ config.ts                 # 調整用の定数
+├─ scripts/
+│  └─ radicals.mjs              # 6.4 の部首データを作る
+└─ tests/
+   ├─ grade.test.ts
+   ├─ picker.test.ts
+   └─ battle.test.ts
+```
+
+- `vitest` の対象に `src/vendor/kanji-quiz/tests/**` も含め、流用した判定エンジンのテストも毎回走らせる
+
+## 5. ゲーム本体（バトル）
+
+### 5.1 基本ルール
+- 画面右に味方の拠点、左に敵の拠点を置き、ユニットは横一直線のレーンを進む
+- **お金**は時間とともに増え、上限がある。財布のレベルを上げると増える速さと上限が上がる
+- ユニットを出すとお金を使い、ユニットごとに再出撃までの待ち時間（クールダウン）がある
+- 敵の拠点HPを0にすれば勝ち、味方の拠点HPが0になれば負け
+- 1ステージは2〜4分で終わるように調整する
+
+### 5.2 味方ユニット（MVPは5種類）
+テーマは「へんてこ生き物」です。小学生が笑ってしまうように、表情とドタバタした動きで笑わせます。下品なギャグ（おなら・おしり・はなみずなど）は入れません。絵は画像ファイルを使わず、Canvas 2D で描きます（`src/art/`）。名前も漢字に読みを添えて書き、習っていない漢字にはふりがなを付けます。
+
+| ID | 名前（1段目 → 進化1 → 進化2） | 役割 | コスト | 特徴 | 使えるようになる時期 |
+|---|---|---|---|---|---|
+| `purun` | ぷるりん → ぷるりんマッチョ → ぷるりんだいせんにん | 壁 | 50 | 安くて体力が高い。叩かれるとぺちゃんこになる | 最初から |
+| `kaeru` | まゆげガエル → げじげじまゆげガエル → まゆげが つながった カエルおう | 近接 | 150 | 平均的な性能。べろでビンタする | 最初から |
+| `neko` | ヒゲながネコ → ヒゲもじゃネコ → ヒゲが じめんまで とどく ネコ | 遠距離 | 300 | 射程が長い。毛玉を投げる | ステージ2のクリア後 |
+| `pengin` | ローラーペンギン → ジェットペンギン → マッハペンギン | 速攻 | 400 | 足が速い。おなかの体当たりでノックバックさせる | ステージ4のクリア後 |
+| `kaba` | どすこいカバ → おおぜきカバ → よこづなカバ | 重量 | 600 | しこで範囲攻撃する。足が遅い | ステージ6のクリア後 |
+
+- 各ユニットは**2段階進化**する（数値が上がり、見た目が変わる）
+- 倒されると「きゅう〜」と目を回してふっとぶ
+
+### 5.3 敵と拠点
+- 敵は「わすれんぼう」族の5種類：わすれんぼう（ザコ）・かちこちわすれ（硬い。なべをかぶっている）・すばしわすれ（速い）・ぽいぽいわすれ（遠距離。まくらを投げる）・おおわすれんぼう（ボス。ときどき寝言を言う）。ナイトキャップと眠そうな目で、頭の上に「？」が浮かぶ。倒されると「おもいだした！」と叫んでふっとぶ
+- ボスはステージ5と10に登場させる
+- 味方の拠点は**きのこハウス**、敵の拠点は**ねぼすけまくらタワー**。HP が減るにつれて表情が変わる
+- ユニットを強くする素材は「**どんぐり**」と呼ぶ
+
+### 5.4 ステージ
+- MVPは10ステージ。ステージ1はチュートリアル（1.1を参照）
+- 敵の強さは学年によって変えない。漢字の難しさは学年で変わるので、ゲーム部分の難しさは全学年共通にする
+- ステージごとに、敵の出現テーブル・拠点HP・クリア報酬を定義する。`stages.ts` にデータとして書き、ロジックとは分ける
+
+## 6. 必殺技：漢字魔法陣（このゲームの中心）
+
+### 6.1 流れ
+1. **魔力ゲージ**は時間経過と敵を倒すことで溜まる。満タンになると「まほう」ボタンが光る
+2. ボタンを押すと、バトルが**スローモーション（速度0.1倍）**になり、`SpellOverlay` が開く
+3. 出題（6.2）が表示され、**制限時間カウントダウン**が始まる
+4. 魔法陣の中の `WritingPad` に漢字を手書きする
+5. 1画書くたびに（`WritingPad` の `stroke` イベント）、魔法陣のまわりのルーン文字が「書いた画数 ÷ お手本の画数」の割合だけ光る。これは**進み具合の演出**であり、正しいかどうかの判定ではない
+6. 次のどれかで判定に進む
+   - 書いた画数がお手本の画数に達して 0.8秒経った（自動で確定）
+   - 「はつどう！」ボタンを押した
+   - 制限時間が経った（その時点の画で判定。何も書いていなければ不発）
+7. 判定の結果（6.3）に応じて必殺技が出るか不発になり、バトルが通常速度に戻る
+
+- `WritingPad` の「1画もどす」（`undo`）「ぜんぶけす」（`clear`）ボタンを付ける。押しても時間は止めない
+- 判定エンジンと KanjiVG データ（約260KB）は、最初に魔法を使うときではなく**バトル開始時に遅延読み込みしておく**（kanji-quiz の `loadTegaki` と同じ方式）。読み込めなかった場合は魔法ボタンを押せないようにし、「じゅんびちゅう」と表示する
+
+### 6.2 出題
+- 書けるかどうかを試すため、**漢字そのものは見せない**
+- `reibun.txt` の例文から1つ選び、読みの部分を□にして表示する
+  - 例：`赤 | (あか)いくつ` → 「**□**いくつ」と表示し、□の下に「あか」とふりがなを付ける
+- 例文はすべてひらがなで書かれているので、1年生でも読める
+- 読み上げは MVP の対象外（14章）
+
+### 6.3 判定（`spell/grade.ts`）
+kanji-quiz の `judge` を**2回**呼び、4段階に分けます。
+
+```ts
+type SpellGrade = 'perfect' | 'success' | 'close' | 'fail';
+
+function gradeSpell(writing: Stroke[], kanji: string, kit: TegakiKit, settings: Settings): {
+  grade: SpellGrade;
+  verdict: Verdict;          // 表示用（書き順あり・なしのうち、実際に効いた方）
+  margin: number;            // 0〜1。基準にどれだけ余裕があったか
+}
+```
+
+1. `strict = judge(writing, model, kanjiGrade, { strokeOrder: true })`
+2. `loose = judge(writing, model, kanjiGrade, { strokeOrder: false })`
+3. `margin = max(shape / limits.shape, strokes / limits.strokes, worst / limits.worst)`（`limits = limitsFor(kanjiGrade, model.length)`）
+
+| 結果 | 条件 | 効果 |
+|---|---|---|
+| **かんぺき** | `strict.ok` かつ `margin ≤ PERFECT_MARGIN`（初期値 0.75） | 効果1.5倍 ＋ 特別演出 ＋ 魔力を20%返す |
+| **せいこう** | `loose.ok`（設定「かきじゅんも みる」が ON のときは `strict.ok`） | 効果1.0倍 |
+| **おしい** | 上のどれでもなく、`reason` が `count` / `shape` / `order` で `hint` か `order` がある | 効果0.5倍 |
+| **ふはつ** | それ以外（`empty`、または `hint` がないほど遠い） | 効果なし ＋ 魔力を50%返す |
+
+- 「かきじゅんも みる」の初期値は OFF（kanji-quiz と同じ）。OFF でも、書き順が正しくないと「かんぺき」にはならないので、書き順を意識するきっかけになる
+- 「せいこう」以下のときは、**`ModelStrokes` で書き順の番号つきのお手本を見せる**（約3秒、タップでとばせる）。まちがえた画は `wrong` で強調し、kanji-quiz の `verdictMessage` と同じ言い方でつまずきを伝える（例：「3かくめは つき出すよ」「2かくめの かきじゅんが ちがうよ」）
+  - 1・2年生が読めるよう、「画目」は「かくめ」とひらがなで表示する
+- しきい値は `config.ts` に置く
+
+### 6.4 必殺技の効果（部首グループで決める）
+漢字の部首で効果の種類が変わります。部首にも自然と目が向くようにするためです。1年生の「火・水・木・金」は、その字自体が各グループの代表になります。
+
+| グループ | 部首の例 | 効果 | 演出 |
+|---|---|---|---|
+| ほのお | 火・灬 | 画面上の敵全員に大ダメージ | 火柱 |
+| みず | 水・氵 | 敵全員を大きくノックバック | 津波 |
+| き | 木・艹・竹 | 敵全員を5秒間止める | ツタで拘束 |
+| かね | 金・刂 | 味方全員に10秒間のバリア | はがねの盾 |
+| ことば | 言・口 | 味方の攻撃力を10秒間1.5倍 | 応援の文字が舞う |
+| ふしぎ | 上記以外 | 中くらいの全体ダメージ | 魔法陣が爆発する |
+
+- 威力は `基本値 × 判定倍率 × (1 + 画数 × 0.05)` とする。画数の多い難しい漢字ほど強くなるので、挑戦する動機になる
+- **部首データ**：kanji-quiz の `kanjivg.ts` には部首が含まれないので、`scripts/radicals.mjs` で作る
+  - kanji-quiz の `scripts/kanjivg.mjs` と**同じ KanjiVG リリース（r20260714）**を読み、各字の `kvg:radical` が付いた要素の `kvg:element`（または `kvg:original`）を取り出す
+  - 対象は `kanji.ts` の1,026字。出力は `src/spell/radicals.ts`（`Record<string, string>`）。KanjiVG 由来なので CC BY-SA 3.0 の表記を先頭に付ける
+  - 部首からグループへの対応表は `effects.ts` にデータで持つ。対応表にない部首は「ふしぎ」にする
+
+### 6.5 なぞりモード（設定でON／低学年向け）
+- 設定で「おてほんを なぞる」を ON にすると、`ModelStrokes` の `guide` で次に書く画を薄く表示する
+- 1画ごとに kanji-quiz の `traceStroke` で判定し、`ok` ならその画を光らせる。`off` / `direction` ならその画を消して、もう一度書いてもらう（kanji-quiz の練習と同じ動き）
+- すべての画をなぞれたら「せいこう」扱い（効果1.0倍、「かんぺき」にはならない）
+- なぞりモードの結果は「れんしゅう」として記録し、8章の習得判定には使わない
+
+## 7. 子どもへの見せ方（判定まわり）
+
+- 書いたあとの○×は、kanji-quiz の `WritingPad` の `mark`（`correct` / `incorrect`）で、テストの丸つけのように表示する
+- 「おしい」のときに、kanji-quiz の `verdictMarks` と同じやり方で、まちがえたお手本の画（`wrong`）や、よけいに書いた画（`highlight`）を強調する
+- 開発用に `?debug` を付けて開くと、判定のあとに `Verdict` の値と `limitsFor` の基準値、書いたストロークの JSON（コピーボタン付き）を表示する（kanji-quiz の TegakiDebug にならう）。「判定がおかしい」と思った字を集めて、kanji-quiz 側の改善にも使えるようにする
+
+## 8. 学習機能
+
+### 8.1 成績の記録（`progress.ts`）
+漢字ごとに次を保存します。
+
+```ts
+interface KanjiProgress {
+  char: string;
+  attempts: number;
+  successes: number;     // せいこう以上
+  perfects: number;
+  lastResult: SpellGrade;
+  lastSeen: number;      // UNIX ms
+  streak: number;        // 連続でせいこう以上
+  mastered: boolean;     // かんぺきを3回連続で取ったら true
+}
+```
+
+### 8.2 出題の選び方（`picker.ts`）
+- 候補は「設定した学年まで」の配当漢字（`kanji.ts` の `grade`）。設定で「この学年だけ」にも切り替えられる
+- 重み付きランダムで選ぶ
+  - 失敗したことのある漢字：重み 3
+  - まだ出題していない漢字：重み 2
+  - 習得済みの漢字：重み 0.3
+  - 直近5問で出た漢字は除外する
+- 同じバトル中に同じ漢字は出さない
+- 1年生の最初の3回は、5画以下の字から出す（はじめての成功体験のため）
+
+### 8.3 魔法書（漢字図鑑）
+- 一度「せいこう」以上を取った漢字が魔法書に登録される
+- 学年別にマス目で表示する。未登録のマスはシルエットのみ
+- 漢字をタップすると、書き順の番号つきのお手本（`ModelStrokes`）・読み・例文・成績・発動する魔法の種類を表示する
+- 習得済みの漢字には金の枠を付ける
+- 学年ごとの登録率（％）を表示する。図鑑を埋めたくなる気持ちを学習につなげる
+
+### 8.4 クリア報酬との連動
+- ステージ結果画面に「こんかい かいた かんじ」と判定の一覧を出す。まちがえた字はタップでお手本を見られる
+- 「かんぺき」の数に応じてボーナス（ユニット強化素材）を渡す
+
+## 9. 画面一覧
+
+1. タイトル
+2. ステージ選択（クリア状況・星3つ評価）
+3. 編成（出撃ユニット5枠の選択・強化）
+4. バトル
+5. 魔法陣オーバーレイ（バトル中）
+6. リザルト
+7. 魔法書（漢字図鑑）
+8. 設定（学年・出題範囲・かきじゅんも みる・おてほんを なぞる・音量・データの消去）
+9. クレジット（kanji-quiz・KanjiVG のライセンス表記）
+
+## 10. 保存データ
+
+- localStorage のキーは `kmw:save:v1` の1つにまとめ、JSONで保存する
+- 中身：ステージの進行状況、ユニットのレベル、所持素材、`KanjiProgress[]`、設定
+- バージョン番号を入れておき、形式が変わったときに移行処理を書けるようにする
+- 書き込みはリザルト時・設定変更時・魔法発動後に行う
+
+## 11. ライセンス
+
+- このゲーム自身のコードは MIT とする（kanji-quiz と同じ）
+- `src/vendor/kanji-quiz/src/data/kanjivg.ts` と `src/spell/radicals.ts` は KanjiVG（© Ulrich Apel）由来で **CC BY-SA 3.0**。ファイル先頭の表記を残し、README とクレジット画面に次を載せる
+  - KanjiVG の名前・作者・URL（https://kanjivg.tagaini.net）・ライセンス（kanji-quiz の `LICENSE` 定数をそのまま使ってよい）
+  - kanji-quiz の名前・URL・ライセンス（MIT）
+
+## 12. 非機能要件
+
+- 初回の読み込みは 1MB 以下（判定エンジンと KanjiVG データは遅延読み込み）
+- iPad（第9世代相当）でバトルが 60fps で動く
+- 手書き判定（`judge` 2回分）は、10画程度の字で 30ms 以内
+- 文字は大きめ（本文18px以上）にする。教科書体のフォント指定は kanji-quiz の `styles.css` にならう
+- 効果音は Web Audio API で鳴らす。ミュートボタンを常に表示する
+- 個人情報は一切取得しない
+
+## 13. 実装フェーズ（Claude Code への依頼順）
+
+各フェーズの終わりに `npm test` と `npm run build` が通る状態にすること。
+
+### Phase 1：kanji-quiz の取り込み
+- [ ] Vue 3 + TS + Vite のプロジェクトを作る（設定は kanji-quiz にそろえる）
+- [ ] 3.2 のファイルを `src/vendor/kanji-quiz/` にコピーし、`VENDOR.md` と `LICENSE` を置く
+- [ ] `createRng` だけを切り出した `battle.ts` を置き、流用したテスト（`handwriting.test.ts`）がそのまま通ることを確認する
+- [ ] `src/spell/tegaki.ts`（遅延読み込み・文言）と `src/spell/grade.ts` を作り、`tests/grade.test.ts` を書く
+  - お手本そのもの → かんぺき
+  - `scribble` で崩した字（`MESS.small`）→ せいこう以上
+  - 書き順を入れ替えた字 → かんぺきにならない
+  - 別の漢字 → ふはつ または おしい（せいこうにならない）
+  - 空 → ふはつ
+- [ ] 練習ページ（`/practice.html`）を作り、出題 → 手書き → 4段階の結果とお手本表示まで動かす。`?debug` で数値も表示する
+  → **ここで実際に子どもに書いてもらい、`PERFECT_MARGIN` を調整する**
+
+### Phase 2：魔法陣UI
+- [ ] `SpellOverlay.vue`（制限時間タイマー・ルーンの演出・自動確定・お手本表示）
+- [ ] なぞりモード（6.5）
+- [ ] `scripts/radicals.mjs` と `effects.ts`
+
+### Phase 3：バトルの最小構成
+- [ ] ゲームループ・お金・ユニット2種・敵2種・拠点HP・勝敗判定
+- [ ] 魔力ゲージと必殺技の発動を組み込む（ほのおグループだけでよい）
+
+### Phase 4：中身を増やす
+- [ ] ユニット5種と進化・敵5種・10ステージ（ステージ1はチュートリアル）
+- [ ] 部首グループ別の6種類の効果
+- [ ] 編成画面・ステージ選択・リザルト
+
+### Phase 5：学習機能
+- [ ] `progress.ts` と `picker.ts`（`tests/picker.test.ts`）
+- [ ] 魔法書（漢字図鑑）画面
+- [ ] 設定画面・保存と読み込み
+
+### Phase 6：仕上げ
+- [ ] 効果音・演出の調整・ボス
+- [ ] クレジット画面
+- [ ] 実機（タブレット・スマホ）での確認。1年生と高学年の両方に遊んでもらって調整する
+
+## 14. 受け入れ基準
+
+- kanji-quiz から流用したテストが、変更なしで通る
+- お手本そのものを入力すると、全1,026字で「かんぺき」になる
+- 子どもがていねいに書いた字が、その学年で9割以上「せいこう」以上になる
+- 書き順を入れ替えた字が「かんぺき」にならない
+- 別の漢字を書いたときに「せいこう」以上にならない
+- 1年生の設定で、2年生以上の漢字が出題されず、画面にも出てこない
+- 制限時間が経ったら必ず判定に進み、バトルが止まったままにならない
+- リロードしても進行状況と漢字の成績が残っている
+- ネットワークを切っても（初回の読み込みのあとは）遊べる
+
+## 15. 今後の拡張候補（MVPの対象外）
+
+- 出題文の読み上げ（Web Speech API）。ひらがなを読むのがまだ苦手な1年生向け
+- 熟語魔法：2文字の熟語を続けて書くと合体必殺技が出る（kanji-quiz の熟語データを流用）
+- 対戦モード：Firebaseを用いて2人で協力プレイ
+- 保護者向け画面：苦手な漢字の一覧を表示する
+- PWA化してオフラインでインストールできるようにする

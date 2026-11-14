@@ -1,0 +1,26 @@
+{
+  "name": "kanji-magic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "kanjivg": "node src/vendor/kanji-quiz/scripts/kanjivg.mjs",
+    "lookalikes": "node --experimental-strip-types --no-warnings=ExperimentalWarning src/vendor/kanji-quiz/scripts/lookalikes.mjs",
+    "radicals": "node scripts/radicals.mjs"
+  },
+  "dependencies": {
+    "vue": "^3.5.44"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "vue-tsc": "^3.3.13"
+  }
+}

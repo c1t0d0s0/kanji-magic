@@ -1,0 +1,358 @@
+/* The look (colours, fonts, buttons) and the parts for WritingPad and ModelStrokes come from
+   kanji-quiz src/styles.css (those components have no <style> of their own). */
+:root {
+    --bg: #eef3ee;
+    --paper: #fdfdfa;
+    --rule: #6aa893;
+    --rule-soft: #c5ddd3;
+    --ink: #1c2a4a;
+    --muted: #566475;
+    --mark: #ffe36e;
+    --mark-soft: #fff5c2;
+    --red: #d63c2c;
+    --red-soft: #fde3df;
+    --on-ink: #fdfdfa;
+    --ui: 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+    --hand: 'Klee One', 'UD Digi Kyokasho N-R', 'Hiragino Maru Gothic ProN', 'Yu Gothic', sans-serif;
+    /* Textbook typefaces, so the kanji in questions have the shapes taught at school */
+    --font-kyokasho: "UD デジタル 教科書体 NP", "UD Digi Kyokasho NP", "UD デジタル 教科書体 NK", "UD Digi Kyokasho NK", "UD デジタル 教科書体 N", "UD Digi Kyokasho N", "UD デジタル 教科書体 NP-R", "UD Digi Kyokasho NP-R", "UD デジタル 教科書体 NK-R", "UD Digi Kyokasho NK-R", "UD デジタル 教科書体 N-R", "UD Digi Kyokasho N-R", "游教科書体 横用", "YuKyokasho Yoko", "游教科書体", "YuKyokasho", "Toppan Bunkyu Kyokasho", "凸版文久教科書体", "Klee One", sans-serif;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #14211c;
+        --paper: #1d2f28;
+        --rule: #4f8a76;
+        --rule-soft: #2f4a40;
+        --ink: #eef1e4;
+        --muted: #a3b3a8;
+        --mark: #8a7417;
+        --mark-soft: #48431f;
+        --red: #ff8d7d;
+        --red-soft: #4d2721;
+        --on-ink: #14211c;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-weight: 500;
+    /* 18px or more, for children (requirements 12) */
+    font-size: 1.125rem;
+    line-height: 1.7;
+    /* The texts are written with spaces between the words (分かち書き): lines break there, not in
+       the middle of a word; a word too long for the line still breaks */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+}
+
+h1,
+h2,
+p,
+ul {
+    margin: 0;
+}
+
+ul {
+    padding: 0;
+    list-style: none;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+    outline: 3px solid var(--ink);
+    outline-offset: 2px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* --- Shared Parts --- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* A tap target of 48px or more (requirements 1.1) */
+    min-height: 3rem;
+    min-width: 3rem;
+    padding: 0 1.1rem;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    background: var(--paper);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.btn-primary {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--on-ink);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* --- 手書き (from kanji-quiz) --- */
+.tegaki {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 0;
+}
+
+/* The space left for the square (TegakiArea.vue makes the square as big as it allows) */
+.tegaki-space {
+    flex: 1 1 0;
+    align-self: stretch;
+    display: grid;
+    place-items: center;
+    min-height: 8rem;
+}
+
+/* A practice square with dotted centre lines, like the kanji question. Writing in it must
+   not scroll or zoom the page, nor open the long-press menu */
+.tegaki-pad {
+    position: relative;
+    box-shadow: 0 0 0 2px var(--rule);
+    background:
+        repeating-linear-gradient(to right, var(--rule-soft) 0 6px, transparent 6px 12px) center / 100% 1px no-repeat,
+        repeating-linear-gradient(to bottom, var(--rule-soft) 0 6px, transparent 6px 12px) center / 1px 100% no-repeat,
+        var(--paper);
+    touch-action: none;
+    overscroll-behavior: contain;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.tegaki-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: crosshair;
+}
+
+/* After the answer the writing fades, and the model is drawn over it */
+.tegaki-canvas.is-locked {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.tegaki-model {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tegaki-model polyline {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 3.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.85;
+}
+
+/* The stroke order, at the start of each stroke */
+.tegaki-model text {
+    fill: var(--red);
+    font-family: var(--ui);
+    font-weight: 700;
+    font-size: 7px;
+    paint-order: stroke;
+    stroke: var(--paper);
+    stroke-width: 2px;
+}
+
+/* The stroke to look at again (out of order or backwards), under the highlighter */
+.tegaki-model polyline.is-wrong-mark {
+    stroke: var(--mark);
+    stroke-width: 11;
+    opacity: 1;
+}
+
+.tegaki-model text.is-wrong {
+    font-size: 9px;
+}
+
+/* A stroke written that the model does not have, pointed at with a red dotted line */
+.tegaki-extra {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tegaki-extra polyline {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 2 10;
+}
+
+/* Marked like a test paper: a red circle around the square, or the square in red */
+.tegaki-pad.correct::after {
+    content: '';
+    position: absolute;
+    inset: -0.6rem;
+    border: 3px solid var(--red);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.tegaki-pad.incorrect {
+    background-color: var(--red-soft);
+}
+
+.tegaki-actions {
+    flex: none;
+    display: flex;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+
+/* What to trace, under the ink: the kanji faint, the stroke to trace now under the
+   highlighter, with a red dot where it starts, its number and an arrow for the way to go */
+.tegaki-guide {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.tegaki-pad .tegaki-canvas {
+    position: relative;
+}
+
+.tegaki-guide polyline {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tegaki-guide .guide-faint {
+    stroke: var(--rule-soft);
+    stroke-width: 4;
+}
+
+.tegaki-guide .guide-now {
+    stroke: var(--mark);
+    stroke-width: 9;
+}
+
+.tegaki-guide .guide-arrow {
+    stroke: var(--red);
+    stroke-width: 1;
+    stroke-dasharray: 2.5 2;
+    opacity: 0.8;
+}
+
+.tegaki-guide marker path {
+    fill: var(--red);
+}
+
+.tegaki-guide .guide-start {
+    fill: var(--red);
+}
+
+.tegaki-guide .guide-number {
+    fill: var(--red);
+    font-family: var(--ui);
+    font-weight: 700;
+    font-size: 8px;
+    paint-order: stroke;
+    stroke: var(--paper);
+    stroke-width: 2px;
+}
+
+
+/* --- The screens of the game --- */
+.screen {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 48rem;
+    min-height: 100dvh;
+    margin: 0 auto;
+    padding: max(0.75rem, env(safe-area-inset-top)) 1rem 2rem;
+}
+
+/* Room on the right for the mute button */
+.screen-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding-right: 3.5rem;
+}
+
+.screen-head h1 {
+    font-family: var(--hand);
+    font-size: 1.6rem;
+    line-height: 1.3;
+}
+
+.card {
+    border: 2px solid var(--rule);
+    border-radius: 0.9rem;
+    background: var(--paper);
+    padding: 0.75rem 1rem;
+}
+
+.check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+}
+
+.check input {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.stars {
+    color: #e0a800;
+    letter-spacing: 0.1em;
+}
+
+/* Furigana over the kanji not learned yet (components/Furi.vue) */
+rt {
+    font-size: 0.5em;
+    font-weight: 500;
+    line-height: 1;
+}
