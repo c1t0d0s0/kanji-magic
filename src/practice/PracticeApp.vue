@@ -14,6 +14,7 @@ import { useNoSelect } from '../components/noSelect';
 import { AUTO_CONFIRM_MS, SPELL_MULTIPLIER } from '../config';
 import { gradeSpell, SPELL_GRADE_LABEL, type SpellResult } from '../spell/grade';
 import { pickQuestion } from '../spell/question';
+import SiteFooter from '../components/SiteFooter.vue';
 import { loadTegaki, outcomeMessage, tegakiDebug, verdictMarks, type TegakiKit } from '../spell/tegaki';
 
 const GRADES = [1, 2, 3, 4, 5, 6];
@@ -169,6 +170,7 @@ onBeforeUnmount(stopTimer);
         <SpellDebug v-if="tegakiDebug && result && item && debugLimits && judged" :kanji="item.kanji" :grade="item.grade"
             :stroke-order="strokeOrder" :result="result" :limits="debugLimits" :writing="judged.writing" :size="judged.size" />
     </main>
+    <SiteFooter />
 </template>
 
 <style scoped>

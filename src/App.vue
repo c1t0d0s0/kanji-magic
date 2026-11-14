@@ -3,6 +3,7 @@
 // クレジット) and the mute button over all of them ---
 import { onMounted, watchEffect } from 'vue';
 import MuteButton from './components/MuteButton.vue';
+import SiteFooter from './components/SiteFooter.vue';
 import TitleScreen from './screens/TitleScreen.vue';
 import StageSelect from './screens/StageSelect.vue';
 import FormationScreen from './screens/FormationScreen.vue';
@@ -32,4 +33,5 @@ watchEffect(() => (document.title = textFor('[漢字|かんじ][魔法|まほう
     <CreditsScreen v-else-if="ui.screen === 'credits'" />
     <!-- The battle has its own (it is part of its page) -->
     <MuteButton v-if="ui.screen !== 'battle'" />
+    <SiteFooter v-if="ui.screen !== 'battle'" />
 </template>

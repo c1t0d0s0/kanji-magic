@@ -321,6 +321,27 @@ button {
     padding: max(0.75rem, env(safe-area-inset-top)) 1rem 2rem;
 }
 
+/* The page: the screen fills the height, the footer is under it (at the bottom when the screen
+   is short) */
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+}
+
+#app > main {
+    flex: 1 0 auto;
+    width: 100%;
+    min-height: 0;
+}
+
+.site-footer {
+    padding: 0.5rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.875rem;
+}
+
 /* Room on the right for the mute button */
 .screen-head {
     display: flex;
