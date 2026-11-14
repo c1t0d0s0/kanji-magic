@@ -10,12 +10,14 @@ import { SPELL_GROUPS, type SpellGroup } from '../spell/effects';
 import type { Choice } from '../spell/question';
 import ElementMark from './ElementMark.vue';
 import MuteButton from './MuteButton.vue';
+import { useNoSelect } from './noSelect';
 import { play } from '../sound';
 
 const props = defineProps<{ choices: Choice[] }>();
 const emit = defineEmits<{ pick: [index: number] }>();
 
 const dialog = ref<HTMLDialogElement | null>(null);
+useNoSelect(dialog);
 const totalMs = CHOICE_SECONDS * 1000;
 const remaining = ref(totalMs);
 let deadline = 0;
@@ -90,7 +92,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <dialog ref="dialog" class="spell-choice" aria-labelledby="choice-title" @cancel.prevent @close="onClose">
+    <dialog ref="dialog" class="spell-choice no-select" aria-labelledby="choice-title" @cancel.prevent @close="onClose">
         <div class="choice-panel">
             <h2 id="choice-title">どの まほうに する？</h2>
             <div class="choice-time" role="timer" :aria-label="`のこり ${seconds}びょう`">

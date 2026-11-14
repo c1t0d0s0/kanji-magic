@@ -127,6 +127,15 @@ button {
     min-height: 0;
 }
 
+/* Where a kanji is written (the magic circle, the 3 cards, the practice square and what is around
+   them): a finger resting there must not select text nor open the long-press menu of iPhone
+   Safari, which starts a selection on the text near the square (components/noSelect.ts) */
+.no-select {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
 /* The space left for the square (TegakiArea.vue makes the square as big as it allows) */
 .tegaki-space {
     flex: 1 1 0;

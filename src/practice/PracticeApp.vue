@@ -10,6 +10,7 @@ import type { KanjiItem } from '../vendor/kanji-quiz/src/data/kanji';
 import type { Reibun } from '../vendor/kanji-quiz/src/data/reibun';
 import SpellPrompt from '../components/SpellPrompt.vue';
 import SpellDebug from '../components/SpellDebug.vue';
+import { useNoSelect } from '../components/noSelect';
 import { AUTO_CONFIRM_MS, SPELL_MULTIPLIER } from '../config';
 import { gradeSpell, SPELL_GRADE_LABEL, type SpellResult } from '../spell/grade';
 import { pickQuestion } from '../spell/question';
@@ -107,6 +108,10 @@ function changeGrade(g: number) {
     pick();
 }
 
+// The writing area: no text selection nor long-press menu (iPhone Safari)
+const writing = ref<HTMLElement | null>(null);
+useNoSelect(writing);
+
 onMounted(async () => {
     pick();
     await load();
@@ -140,7 +145,7 @@ onBeforeUnmount(stopTimer);
         </p>
         <p v-else-if="!kit" class="status">じゅんびちゅう…</p>
 
-        <section class="tegaki">
+        <section ref="writing" class="tegaki no-select">
             <WritingPad ref="pad" :locked="locked || !ready" :faded="locked && result?.grade !== 'perfect'" :mark="mark"
                 :highlight="locked ? marks.written : null" @count="onCount" @stroke="onStroke">
                 <!-- The model with the stroke order, unless it was かんぺき -->

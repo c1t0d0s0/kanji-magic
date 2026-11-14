@@ -16,6 +16,7 @@ import { createRng } from '../vendor/kanji-quiz/src/core/battle';
 import SpellPrompt from './SpellPrompt.vue';
 import SpellDebug from './SpellDebug.vue';
 import MuteButton from './MuteButton.vue';
+import { useNoSelect } from './noSelect';
 import { AUTO_CONFIRM_MS, MODEL_SHOW_MS, PERFECT_SHOW_MS } from '../config';
 import { gradeSpell, SPELL_GRADE_LABEL, type SpellOutcome } from '../spell/grade';
 import type { Question } from '../spell/question';
@@ -42,6 +43,7 @@ const totalMs = spellSeconds(expected.value) * 1000;
 
 const dialog = ref<HTMLDialogElement | null>(null);
 const pad = ref<InstanceType<typeof WritingPad> | null>(null);
+useNoSelect(dialog);
 const count = ref(0);
 // なぞりモード: how many strokes have been traced right
 const traced = ref(0);
@@ -196,7 +198,8 @@ function finish() {
     emit('done', outcome.value!);
 }
 
-// A tap while the result is shown skips it (not the tap that cast the spell)
+// A tap while the result is shown skips it (not the tap that cast the spell). pointerup too: a
+// touch on the square gives no click (noSelect.ts stops it, for Safari's long press)
 function onTap() {
     if (shown.value && performance.now() - shownAt > 300) finish();
 }
@@ -225,7 +228,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <dialog ref="dialog" class="spell-overlay" aria-label="まほうじん" @cancel.prevent @close="onClose" @click="onTap">
+    <dialog ref="dialog" class="spell-overlay no-select" aria-label="まほうじん" @cancel.prevent @close="onClose" @click="onTap" @pointerup="onTap">
         <div class="spell-panel">
             <SpellPrompt class="spell-question" :reibun="question.reibun" :answer="shown ? kanji : null" />
 
