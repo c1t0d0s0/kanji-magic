@@ -14,7 +14,7 @@ function open(screen: 'stages' | 'book' | 'settings' | 'credits') {
 
 <template>
     <main class="title">
-        <h1><Furi text="KM[魔法|まほう]" /><br><Furi text="[大|だい][戦争|せんそう]" /></h1>
+        <h1><span class="title-line"><Furi text="KM[魔法|まほう]" /></span><span class="title-line"><Furi text="[大|だい][戦争|せんそう]" /></span></h1>
         <TitleParade />
         <nav class="title-menu">
             <button type="button" class="btn btn-primary btn-big" @click="open('stages')"><Furi text="[遊|あそ]ぶ" /></button>
@@ -42,6 +42,21 @@ h1 {
     line-height: 1.2;
     color: #6b4fd8;
     text-shadow: 0 3px 0 var(--mark);
+}
+
+/* On a phone: two lines. On a wide screen (a PC): one line */
+.title-line {
+    display: block;
+}
+
+@media (min-width: 48em) {
+    h1 {
+        white-space: nowrap;
+    }
+
+    .title-line {
+        display: inline;
+    }
 }
 
 .title-menu {
