@@ -6,7 +6,9 @@ import { restPose, type Pose } from '../src/art/pose';
 import { createBattle, step, summon } from '../src/game/battle';
 import { ENEMIES } from '../src/game/enemies';
 import { drawBattle } from '../src/game/render';
-import { stageById } from '../src/game/stages';
+import { STAGES, stageById } from '../src/game/stages';
+import { sceneOf } from '../src/game/scenes';
+import { drawSkyLife, drawWeather, paintScene } from '../src/art/scenery';
 import { UNITS, UNIT_IDS } from '../src/game/units';
 import { bareKanji } from '../src/learning/furi';
 import { canShow } from '../src/learning/visible';
@@ -77,6 +79,25 @@ describe('the pictures', () => {
                 }
             }
         }
+    });
+
+    it('every stage has its own look, and it draws: the land, the weather, the tower', () => {
+        const looks = new Set(STAGES.map(st => JSON.stringify(sceneOf(st.id))));
+        expect(looks.size).toBe(STAGES.length);
+        for (const st of STAGES) {
+            const scene = sceneOf(st.id);
+            const { ctx, count } = fakeCtx();
+            paintScene(ctx, scene, 1000, 330, 400);
+            for (const t of [0, 1700, 9000]) {
+                drawSkyLife(ctx, scene, 1000, t);
+                drawWeather(ctx, scene, 1000, 330, 400, t);
+            }
+            for (const ratio of [1, 0.4, 0.1]) for (const hurt of [0, 1]) drawPillowTower(ctx, 70, 330, ratio, hurt, 1234, scene.tower);
+            expect(count.save, `stage ${st.id}`).toBe(count.restore);
+            expect(count.calls, `stage ${st.id}`).toBeGreaterThan(50);
+        }
+        // A stage with no look of its own (a test) has the meadow
+        expect(sceneOf(99)).toEqual(sceneOf(1));
     });
 
     it('the effects of the fighters draw from start to end', () => {

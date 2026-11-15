@@ -8,6 +8,8 @@ import { drawMark } from '../art/marks';
 import { shout, star } from '../art/parts';
 import type { Pose } from '../art/pose';
 import { LANE } from '../config';
+import { drawSkyLife, drawWeather, paintScene } from '../art/scenery';
+import { sceneOf, type Scene } from './scenes';
 import type { Base, Battle, Fighter, Fx } from './battle';
 
 export const FIELD_HEIGHT = 400;
@@ -27,12 +29,12 @@ function bar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, par
     ctx.fill();
 }
 
-function drawBase(ctx: CanvasRenderingContext2D, base: Base, x: number, ally: boolean, time: number) {
+function drawBase(ctx: CanvasRenderingContext2D, base: Base, x: number, ally: boolean, time: number, scene: Scene) {
     const ratio = base.hp / base.max;
     const hurt = base.hurtMs / 200;
     const shake = base.hurtMs > 0 ? Math.sin(base.hurtMs) * 3 : 0;
     if (ally) drawMushroomHouse(ctx, x + shake, GROUND, ratio, hurt, time);
-    else drawPillowTower(ctx, x + shake, GROUND, ratio, hurt, time);
+    else drawPillowTower(ctx, x + shake, GROUND, ratio, hurt, time, scene.tower);
     const top = GROUND - (ally ? 205 : 225);
     bar(ctx, x, top, 120, ratio, ratio > 0.3 ? '#4cc26b' : '#e5533d');
     ctx.font = `bold 18px ${UI}`;
@@ -107,73 +109,23 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
     if (f.hp < f.maxHp) bar(ctx, f.x, GROUND - size * 1.15 - 18, Math.max(30, f.size), f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d');
 }
 
-// The sky, the hills and the grass do not move: drawn once for each scale
-let backdrop: { scale: number; canvas: HTMLCanvasElement } | null = null;
+// The look of the stage (game/scenes.ts) does not move: drawn once for each stage and scale
+let backdrop: { key: string; canvas: HTMLCanvasElement } | null = null;
 
-function paintBackdrop(ctx: CanvasRenderingContext2D, w: number) {
-    const sky = ctx.createLinearGradient(0, 0, 0, GROUND);
-    sky.addColorStop(0, '#9fd3f7');
-    sky.addColorStop(1, '#eaf7ff');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, w, GROUND);
-    // Far hills, and nearer ones
-    for (const [color, base, hill] of [['#bfe3b0', 250, 70], ['#a5d68c', 285, 45]] as const) {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(0, GROUND);
-        for (let x = 0; x <= w; x += 20) ctx.lineTo(x, base - Math.abs(Math.sin(x / (hill * 2.3) + hill)) * hill);
-        ctx.lineTo(w, GROUND);
-        ctx.fill();
-    }
-    ctx.fillStyle = '#8cc56b';
-    ctx.fillRect(0, GROUND, w, FIELD_HEIGHT - GROUND);
-    ctx.fillStyle = '#76ad58';
-    ctx.fillRect(0, GROUND, w, 6);
-    // Tufts of grass and little flowers
-    for (let x = 15; x < w; x += 47) {
-        const y = GROUND + 18 + ((x * 7) % 40);
-        ctx.strokeStyle = '#5f9a45';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x - 5, y); ctx.lineTo(x - 7, y - 8);
-        ctx.moveTo(x, y); ctx.lineTo(x, y - 10);
-        ctx.moveTo(x + 5, y); ctx.lineTo(x + 7, y - 8);
-        ctx.stroke();
-        if (x % 3 === 0) {
-            ctx.fillStyle = x % 2 ? '#fff6a8' : '#ffc8dd';
-            ctx.beginPath();
-            ctx.arc(x + 12, y - 4, 3.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-function drawBackdrop(ctx: CanvasRenderingContext2D, w: number, scale: number) {
-    if (typeof document === 'undefined') return paintBackdrop(ctx, w);
-    if (!backdrop || backdrop.scale !== scale) {
+function drawBackdrop(ctx: CanvasRenderingContext2D, scene: Scene, id: number, w: number, scale: number) {
+    if (typeof document === 'undefined') return paintScene(ctx, scene, w, GROUND, FIELD_HEIGHT);
+    const key = `${id}:${scale}`;
+    if (!backdrop || backdrop.key !== key) {
         const c = document.createElement('canvas');
         c.width = Math.ceil(w * scale);
         c.height = Math.ceil(FIELD_HEIGHT * scale);
         const g = c.getContext('2d');
-        if (!g) return paintBackdrop(ctx, w);
+        if (!g) return paintScene(ctx, scene, w, GROUND, FIELD_HEIGHT);
         g.setTransform(scale, 0, 0, scale, 0, 0);
-        paintBackdrop(g, w);
-        backdrop = { scale, canvas: c };
+        paintScene(g, scene, w, GROUND, FIELD_HEIGHT);
+        backdrop = { key, canvas: c };
     }
     ctx.drawImage(backdrop.canvas, 0, 0, w, FIELD_HEIGHT);
-}
-
-// Clouds drift slowly
-function drawClouds(ctx: CanvasRenderingContext2D, w: number, time: number) {
-    ctx.fillStyle = 'rgb(255 255 255 / 0.9)';
-    for (let k = 0; k < 4; k++) {
-        const x = ((k * 290 + time / (90 + k * 30)) % (w + 200)) - 100, y = 45 + (k % 2) * 50;
-        ctx.beginPath();
-        ctx.arc(x, y, 22, 0, Math.PI * 2);
-        ctx.arc(x + 25, y - 10, 26, 0, Math.PI * 2);
-        ctx.arc(x + 52, y, 20, 0, Math.PI * 2);
-        ctx.fill();
-    }
 }
 
 const ease = (t: number) => 1 - (1 - t) * (1 - t);
@@ -322,14 +274,18 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
 export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: number) {
     const w = LANE.width;
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
-    drawBackdrop(ctx, w, scale);
-    // The clouds move with the clock, not the battle (they go on while the magic circle is open)
-    drawClouds(ctx, w, typeof performance !== 'undefined' ? performance.now() : b.time);
-    drawBase(ctx, b.enemyBase, LANE.enemyBase, false, b.time);
-    drawBase(ctx, b.allyBase, LANE.allyBase, true, b.time);
+    const scene = sceneOf(b.stage.id);
+    // The clouds and the weather move with the clock, not the battle (they go on while the magic
+    // circle is open)
+    const clock = typeof performance !== 'undefined' ? performance.now() : b.time;
+    drawBackdrop(ctx, scene, b.stage.id, w, scale);
+    drawSkyLife(ctx, scene, w, clock);
+    drawBase(ctx, b.enemyBase, LANE.enemyBase, false, b.time, scene);
+    drawBase(ctx, b.allyBase, LANE.allyBase, true, b.time, scene);
     // Bigger ones behind
     const order = [...b.fighters].sort((p, q) => q.size - p.size);
     const boosted = b.boostMs > 0;
     for (const f of order) drawFighter(ctx, f, b.time, boosted);
+    drawWeather(ctx, scene, w, GROUND, FIELD_HEIGHT, clock);
     for (const fx of b.fx) drawFx(ctx, fx, w);
 }

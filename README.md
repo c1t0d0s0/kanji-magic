@@ -32,6 +32,7 @@ Google タグを埋め込むときは、`config.example.js` を `config.js` に�
 - `src/components/MorseOverlay.vue`・`src/morse/`：モールス信号の魔法（設定で選ぶ。タッチのできない PC 向け）。`code.ts`（A–Z・0–9 の符号）・`paddleRepeater.ts`（パドルの連続打鍵）・`keyer.ts`（パドル／電鍵とキーボード、文字の確定）・`spell.ts`（打つ言葉・制限時間・結果）。打鍵のしくみと符号の表は [Morse Master](https://github.com/c1t0d0s0/morse-master)（同じ作者、MIT）から移植した
 - `src/config.ts`：調整用の定数（`PERFECT_MARGIN`・制限時間・魔法の基本値・お金・魔力・レベル・報酬など）
 - `src/game/`：バトル本体（Vue に依存しない）。`battle.ts`（状態と1ステップの処理）・`loop.ts`（60Hz の固定ステップ）・`render.ts`（Canvas への描画）・`units.ts`・`enemies.ts`・`stages.ts`（20ステージのデータ）
+- `src/game/scenes.ts`・`src/art/scenery.ts`：ステージごとの見た目（時間帯・地形・目印・地面・天気・敵の城の飾り）のデータと、その描画
 - `src/art/`：キャラクター（へんてこ生き物・わすれんぼう）・きのこハウス・まくらタワー・ふっとびなどの絵。画像ファイルは使わず、Canvas 2D のパスで描く（Vue に依存しない）。`characters.ts` の `ART` が種類ごとの描画関数で、HTML 側では `src/components/CharacterIcon.vue` から使う
 - `src/learning/`：`progress.ts`（漢字ごとの成績）・`picker.ts`（出題の重み付け）・`visible.ts`（設定した学年より上の漢字を画面に出さない）
 - `src/storage.ts`・`src/store.ts`：localStorage の保存（`kmw:save:v1`）と、画面どうしで共有する状態
