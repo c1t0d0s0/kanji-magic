@@ -1,16 +1,19 @@
 // --- Drawing the battle on a canvas (2D) ---
 // The field is 1000 wide (LANE) and FIELD_HEIGHT high, scaled to the canvas. The characters and the
 // bases are drawn by src/art; here they are put in their places, with the spells over them.
+// On a narrow screen (a phone held upright) the whole field is small: the characters, their
+// element marks and what is shown over them are drawn bigger (lookFor), on a ring of the colour of
+// their element. Only the pictures: the battle is the same.
 import { drawMushroomHouse, drawPillowTower } from '../art/bases';
 import { ART } from '../art/characters';
 import { drawFly, drawShot, drawStomp } from '../art/fx';
-import { drawMark } from '../art/marks';
+import { drawMark, MARK_PATHS } from '../art/marks';
 import { shout, star } from '../art/parts';
 import type { Pose } from '../art/pose';
 import { ENEMY_MAGIC, LANE } from '../config';
 import { drawSkyLife, drawWeather, paintScene } from '../art/scenery';
 import { sceneOf, type Scene } from './scenes';
-import { enemyMagicSoon, type Base, type Battle, type Fighter, type Fx } from './battle';
+import { enemyMagicSoon, type Base, type Battle, type Fighter, type Fx, type FxWho } from './battle';
 
 export const FIELD_HEIGHT = 400;
 const GROUND = 330;
@@ -18,16 +21,51 @@ const GROUND = 330;
 const DRAW_SCALE = 1.3;
 const UI = '"Zen Maru Gothic", "Hiragino Maru Gothic ProN", sans-serif';
 
-function bar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, part: number, color: string) {
+function bar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, part: number, color: string, h = 7) {
     ctx.fillStyle = 'rgb(0 0 0 / 0.35)';
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y, w, 7, 3.5);
+    ctx.roundRect(x - w / 2, y, w, h, h / 2);
     ctx.fill();
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.roundRect(x - w / 2, y, w * Math.max(0, Math.min(1, part)), 7, 3.5);
+    ctx.roundRect(x - w / 2, y, w * Math.max(0, Math.min(1, part)), h, h / 2);
     ctx.fill();
 }
+
+// --- How big to draw, by the size of the field on the screen ---
+// cssPerUnit: CSS px of the screen for 1 of the field (its width / LANE.width): 1.0 or so on a PC,
+// 0.36 on a phone held upright. boost: the characters this many times bigger (1: as they are);
+// markPx: the element mark, never under MARK_MIN_PX on the screen; ring: the element's colour under
+// the feet
+export interface Look {
+    boost: number;
+    markPx: number;
+    bossMarkPx: number;
+    ring: boolean;
+}
+
+const BOOST_AT = 0.62;
+const BOOST_MAX = 1.6;
+export const MARK_MIN_PX = 12;
+const BOSS_MARK_MIN_PX = 16;
+
+export function lookFor(cssPerUnit: number): Look {
+    const unit = cssPerUnit > 0 ? cssPerUnit : 1;
+    const boost = Math.min(BOOST_MAX, Math.max(1, BOOST_AT / unit));
+    return {
+        boost,
+        markPx: Math.max(15, MARK_MIN_PX / unit),
+        bossMarkPx: Math.max(22, BOSS_MARK_MIN_PX / unit),
+        ring: boost > 1
+    };
+}
+
+// The look of the field being drawn (set by drawBattle)
+let look: Look = lookFor(1);
+// The size a character is drawn at
+const drawn = (size: number) => size * DRAW_SCALE * look.boost;
+// One that flies off or throws, as big as it is drawn (src/art/fx.ts draws it by its size)
+const grown = (who: FxWho): FxWho => (look.boost === 1 ? who : { ...who, size: who.size * look.boost });
 
 function drawBase(ctx: CanvasRenderingContext2D, base: Base, x: number, ally: boolean, time: number, scene: Scene) {
     const ratio = base.hp / base.max;
@@ -65,12 +103,28 @@ export function poseOf(f: Fighter, time: number): Pose {
 }
 
 function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, boosted: boolean) {
-    const size = f.size * DRAW_SCALE;
+    const size = drawn(f.size);
     const r = size / 2;
-    ctx.fillStyle = 'rgb(0 0 0 / 0.16)';
-    ctx.beginPath();
-    ctx.ellipse(f.x, GROUND, r * 1.05, r * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
+    if (look.ring && f.element) {
+        // The colour of its element under its feet: seen even when the mark is hidden
+        const color = MARK_PATHS[f.element].color;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(f.x, GROUND, r * 1.1, r * 0.28, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.5 * look.boost;
+        ctx.stroke();
+        ctx.restore();
+    } else {
+        ctx.fillStyle = 'rgb(0 0 0 / 0.16)';
+        ctx.beginPath();
+        ctx.ellipse(f.x, GROUND, r * 1.05, r * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
     ctx.save();
     ctx.translate(f.x, GROUND);
     // Pictures face right: ours walk to the left
@@ -83,9 +137,9 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         const ally = f.side === 'ally';
         ctx.strokeStyle = ally ? 'rgb(120 190 255 / 0.9)' : 'rgb(240 130 200 / 0.9)';
         ctx.fillStyle = ally ? 'rgb(150 210 255 / 0.18)' : 'rgb(255 180 225 / 0.22)';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * look.boost;
         ctx.beginPath();
-        ctx.arc(f.x, y, r + 8, 0, Math.PI * 2);
+        ctx.arc(f.x, y, r + 8 * look.boost, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
     }
@@ -93,7 +147,8 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         // Ours asleep (ねむりの きり): Zzz going up
         for (let k = 0; k < 3; k++) {
             const up = ((time / 700 + k / 3) % 1);
-            shout(ctx, 'Z', f.x + r * 0.4 + up * 14, y - r - 6 - up * 26, 12 + k * 4, '#6a4c93', 1 - up);
+            const k2 = look.boost;
+            shout(ctx, 'Z', f.x + r * 0.4 + up * 14 * k2, y - r - 6 - up * 26 * k2, (12 + k * 4) * k2, '#6a4c93', 1 - up);
         }
     } else if (f.stopMs > 0) {
         // Bound by vines, with leaves
@@ -111,10 +166,14 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
             ctx.fill();
         }
     }
-    if (boosted && f.side === 'ally') star(ctx, f.x - r * 0.8, GROUND - size - 6 + Math.sin(time / 120 + f.id) * 3, 6, '#ffd84a', time / 300);
+    if (boosted && f.side === 'ally') star(ctx, f.x - r * 0.8, GROUND - size - 6 + Math.sin(time / 120 + f.id) * 3, 6 * look.boost, '#ffd84a', time / 300);
     // The element, over the head
-    if (f.element) drawMark(ctx, f.element, f.x + (f.side === 'ally' ? r * 0.55 : -r * 0.55), GROUND - size * 1.05, f.boss ? 22 : 15);
-    if (f.hp < f.maxHp) bar(ctx, f.x, GROUND - size * 1.15 - 18, Math.max(30, f.size), f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d');
+    const mark = f.boss ? look.bossMarkPx : look.markPx;
+    if (f.element) drawMark(ctx, f.element, f.x + (f.side === 'ally' ? r * 0.55 : -r * 0.55), GROUND - size * 1.05 - (mark - 15) * 0.3, mark);
+    if (f.hp < f.maxHp) {
+        const h = 7 * look.boost;
+        bar(ctx, f.x, GROUND - size * 1.15 - 18 * look.boost, Math.max(30, f.size) * look.boost, f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d', h);
+    }
 }
 
 // The look of the stage (game/scenes.ts) does not move: drawn once for each stage and scale
@@ -153,10 +212,10 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
                 ctx.arc(fx.x, GROUND - 25, 10 + 120 * t, 0, Math.PI * 2);
                 ctx.stroke();
             }
-            if (fx.who) drawFly(ctx, fx.who, fx.x, GROUND, t, fx.ms);
+            if (fx.who) drawFly(ctx, grown(fx.who), fx.x, GROUND, t, fx.ms);
             break;
         case 'shot':
-            if (fx.who && fx.to !== undefined) drawShot(ctx, fx.who, fx.x, fx.to, GROUND, t, fx.ms);
+            if (fx.who && fx.to !== undefined) drawShot(ctx, grown(fx.who), fx.x, fx.to, GROUND, t, fx.ms);
             break;
         case 'stomp':
             // The hippo's stamp, the alarm clock's ring, the king's dream cloud
@@ -164,21 +223,22 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             break;
         case 'heal':
             // A lullaby healed it: a green ＋ rises
-            if (fx.who) shout(ctx, '＋', fx.x, GROUND - fx.who.size * DRAW_SCALE - 10 - t * 30, 26, '#2b9348', fade * 1.5);
+            if (fx.who) shout(ctx, '＋', fx.x, GROUND - drawn(fx.who.size) - 10 - t * 30, 26 * look.boost, '#2b9348', fade * 1.5);
             break;
         case 'split':
             // A ふたご came apart: a puff and パカッ
             ctx.fillStyle = `rgb(255 255 255 / ${0.8 * fade})`;
             ctx.beginPath();
-            ctx.arc(fx.x, GROUND - 30, 20 + 40 * t, 0, Math.PI * 2);
+            ctx.arc(fx.x, GROUND - 30 * look.boost, (20 + 40 * t) * look.boost, 0, Math.PI * 2);
             ctx.fill();
-            shout(ctx, 'パカッ', fx.x, GROUND - 90 - t * 20, 22, '#b5179e', fade * 1.5);
+            shout(ctx, 'パカッ', fx.x, GROUND - 90 * look.boost - t * 20, 22 * look.boost, '#b5179e', fade * 1.5);
             break;
         case 'spark':
             // A hit on the element it beats: stars burst out
             for (let k = 0; k < 4; k++) {
                 const a = (k * Math.PI) / 2 + t * 2;
-                star(ctx, fx.x + Math.cos(a) * 14 * (0.5 + t), GROUND - (fx.who?.size ?? 30) * 0.7 + Math.sin(a) * 14 * (0.5 + t), 6 * fade, '#ffe14a', a);
+                const d = 14 * look.boost * (0.5 + t);
+                star(ctx, fx.x + Math.cos(a) * d, GROUND - (fx.who?.size ?? 30) * 0.7 * look.boost + Math.sin(a) * d, 6 * look.boost * fade, '#ffe14a', a);
             }
             break;
         case 'good':
@@ -189,8 +249,9 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             break;
         case 'change':
             if (fx.who?.element) {
-                shout(ctx, 'ぞくせい チェンジ！', fx.x, GROUND - (fx.who.size * 1.3) - 70 - t * 20, 22, '#7a2c4d', fade * 1.5);
-                drawMark(ctx, fx.who.element, fx.x, GROUND - fx.who.size * 1.3 - 40 - t * 20, 30 * (1 + 0.3 * Math.sin(t * Math.PI)));
+                const top = GROUND - drawn(fx.who.size);
+                shout(ctx, 'ぞくせい チェンジ！', fx.x, top - 70 * look.boost - t * 20, 22 * look.boost, '#7a2c4d', fade * 1.5);
+                drawMark(ctx, fx.who.element, fx.x, top - 40 * look.boost - t * 20, Math.max(30, look.bossMarkPx * 1.3) * (1 + 0.3 * Math.sin(t * Math.PI)));
             }
             break;
         case 'fire':
@@ -264,8 +325,10 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             if (!fx.who || fx.amount === undefined) break;
             const big = fx.tone === 'good', small = fx.tone === 'weak';
             const pop = 1 + 0.35 * Math.max(0, 1 - t * 6);
-            const px = (big ? 40 : small ? 24 : 32) * pop;
-            const y = GROUND - fx.who.size * DRAW_SCALE * 1.15 - 34 - ease(t) * 40 - (fx.stack ?? 0) * 46;
+            // Bigger on a small field, but not as much as the characters (the numbers would cover them)
+            const k = 1 + (look.boost - 1) * 0.6;
+            const px = (big ? 40 : small ? 24 : 32) * pop * k;
+            const y = GROUND - drawn(fx.who.size) * 1.15 - 34 * k - ease(t) * 40 - (fx.stack ?? 0) * 46 * k;
             shout(ctx, `-${fx.amount}${big ? '!' : ''}`, fx.x, y, px, big ? '#d9480f' : small ? '#6c757d' : '#c92a2a', Math.min(1, fade * 2.5));
             break;
         }
@@ -353,8 +416,10 @@ function drawCharge(ctx: CanvasRenderingContext2D, b: Battle) {
 }
 
 // Draws the whole field; the canvas is `scale` device pixels per unit of the field
-export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: number) {
+// cssPerUnit: as lookFor (by default as `scale`, for a canvas not scaled by CSS)
+export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: number, cssPerUnit = scale) {
     const w = LANE.width;
+    look = lookFor(cssPerUnit);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     const scene = sceneOf(b.stage.id);
     // The clouds and the weather move with the clock, not the battle (they go on while the magic

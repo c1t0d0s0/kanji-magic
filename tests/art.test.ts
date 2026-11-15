@@ -5,7 +5,7 @@ import { drawFly, drawShot, drawStomp } from '../src/art/fx';
 import { restPose, type Pose } from '../src/art/pose';
 import { createBattle, step, summon } from '../src/game/battle';
 import { ENEMIES } from '../src/game/enemies';
-import { drawBattle } from '../src/game/render';
+import { drawBattle, lookFor, MARK_MIN_PX } from '../src/game/render';
 import { STAGES, stageById } from '../src/game/stages';
 import { sceneOf } from '../src/game/scenes';
 import { drawSkyLife, drawWeather, paintScene } from '../src/art/scenery';
@@ -121,10 +121,26 @@ describe('the pictures', () => {
             b.money = 5000;
             for (const id of UNIT_IDS) summon(b, id);
             step(b, 1000 / 60);
-            if (i % 30 === 0) drawBattle(ctx, b, 1);
+            // On a phone held upright (the field 360 px wide) every other time
+            if (i % 30 === 0) drawBattle(ctx, b, 1, i % 60 === 0 ? 0.36 : 1);
         }
         expect(count.save).toBe(count.restore);
         expect(count.texts).toContain('おもいだした！');
+    });
+
+    it('draws the characters and their marks bigger on a small field (a phone), as they are on a PC', () => {
+        expect(lookFor(1).boost).toBe(1);
+        expect(lookFor(0.7).boost).toBe(1);
+        expect(lookFor(1).ring).toBe(false);
+        const phone = lookFor(0.36);
+        expect(phone.boost).toBeCloseTo(1.6);
+        expect(phone.ring).toBe(true);
+        for (const unit of [0.3, 0.36, 0.5, 0.7, 1, 1.4]) {
+            const l = lookFor(unit);
+            expect(l.markPx * unit).toBeGreaterThanOrEqual(MARK_MIN_PX - 1e-9);
+            expect(l.markPx).toBeGreaterThanOrEqual(15);
+            expect(l.bossMarkPx).toBeGreaterThan(l.markPx - 1e-9);
+        }
     });
 
     it('the names have a reading for each kanji; the words on the field are in kana', () => {

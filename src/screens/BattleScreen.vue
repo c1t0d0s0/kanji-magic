@@ -99,6 +99,8 @@ const canvas = ref<HTMLCanvasElement | null>(null);
 const field = ref<HTMLElement | null>(null);
 const hudBox = ref<HTMLElement | null>(null);
 let scale = 1;
+// CSS px of the screen for 1 of the field: small on a phone, where the characters are drawn bigger
+let cssPerUnit = 1;
 let observer: ResizeObserver | null = null;
 // A PC (as in the style below): the battle has to fit in the window
 const pc = typeof matchMedia === 'function' ? matchMedia('(min-width: 64em) and (min-height: 36em)') : null;
@@ -133,6 +135,7 @@ function fit() {
     c.width = Math.round(width * ratio);
     c.height = Math.round(height * ratio);
     scale = (width * ratio) / LANE.width;
+    cssPerUnit = width / LANE.width;
     draw();
 }
 
@@ -143,7 +146,7 @@ const SOUND_OF: Record<BattleEvent, SoundName> = {
 let finishing = false;
 function draw() {
     const ctx = canvas.value?.getContext('2d');
-    if (ctx) drawBattle(ctx, battle, scale);
+    if (ctx) drawBattle(ctx, battle, scale, cssPerUnit);
     for (const e of battle.events) play(SOUND_OF[e]);
     battle.events.length = 0;
     const w = walletOf(battle);
@@ -560,8 +563,16 @@ canvas {
     to { box-shadow: 0 0 0 4px rgb(229 153 247 / 0.7); }
 }
 
-/* A phone: the field is small; one line only (the まもり card says what it does) */
+/* A phone: the field to the edges of the screen (it is all the bigger), and the enemy's magic told
+   on one line only (the まもり card says what it does) */
 @media (max-width: 40em) {
+    .battle-field {
+        width: calc(100% + 2rem);
+        margin-inline: -1rem;
+        border-radius: 0;
+        box-shadow: 0 2px 0 var(--rule), 0 -2px 0 var(--rule);
+    }
+
     .enemy-warn {
         top: 0.25rem;
         padding: 0.1rem 0.6rem;
