@@ -90,6 +90,19 @@ export const MANA_MAX = 100;
 export const MANA_PER_SECOND = 2.2;
 // The spells hurt the boss less, and push it back less
 export const BOSS_SPELL_RESIST = 0.5;
+// --- The enemy's magic (the enemy tower casts it, from the 6th stage: stages.ts enemyMagic) ---
+// It is told this long (ms of the battle) before it goes off. sleep: ours on the field stop
+// (not those with a barrier); meteor: ours lose this part of their max hp (the barrier takes it)
+// and our base this part of its max (none while the barrier lasts); futon: every enemy gets a
+// barrier of this × the stage's power. When the barrier stops it, this part of the magic gauge comes
+// back (まもり is not lost)
+export const ENEMY_MAGIC = {
+    warnMs: 8000,
+    sleep: { ms: 1500 },
+    meteor: { unit: 0.12, base: 0.025 },
+    futon: { shield: 60 },
+    blockRefund: 0.5
+} as const;
 
 // --- The units: levels and evolutions ---
 export const MAX_LEVEL = 10;

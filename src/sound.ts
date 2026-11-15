@@ -5,7 +5,9 @@ import type { SpellGroup } from './spell/effects';
 
 export type SoundName =
     | 'tap' | 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'open' | 'rune'
-    | 'perfect' | 'success' | 'close' | 'fail' | SpellGroup;
+    | 'perfect' | 'success' | 'close' | 'fail' | SpellGroup
+    // The enemy's magic: told (warn), going off, stopped by the barrier
+    | 'warn' | 'enemyMagic' | 'blocked';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -103,6 +105,9 @@ export function play(name: SoundName) {
         case 'wood': notes([392, 523, 659], 0.06, 0.3, 'triangle', 0.15); break;
         case 'metal': tone(1568, 0, 0.6, 'square', 0.06); tone(2093, 0.05, 0.5, 'sine', 0.1); break;
         case 'word': notes([523, 659, 784, 659, 784], 0.07, 0.15, 'square', 0.08); break;
+        case 'warn': notes([988, 740, 988, 740], 0.12, 0.1, 'square', 0.07); break;
+        case 'enemyMagic': tone(500, 0, 0.7, 'sawtooth', 0.08, 140); noise(0.1, 0.5, 0.15, 700); break;
+        case 'blocked': tone(1760, 0, 0.25, 'square', 0.06); tone(1320, 0.08, 0.3, 'sine', 0.12); break;
         case 'wonder': tone(200, 0, 0.7, 'sine', 0.25, 900); noise(0.3, 0.5, 0.2, 1500); break;
     }
 }

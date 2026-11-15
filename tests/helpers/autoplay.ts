@@ -2,15 +2,18 @@
 // wall when an enemy comes near, makes the wallet bigger early, and casts a spell (as good as
 // `spell` says) when the gauge is full. `choose` says how it chooses its units and its spells:
 // 'best' by the elements of the enemies (as a child who looks at the marks), 'worst' the other
-// way, 'fixed' always 火 and the first units. Plays a whole stage and tells how it went.
+// way, 'fixed' always 火 and the first units. `guard` (by itself with 'best'): when the enemy
+// tower's magic that a barrier stops is coming, it keeps the gauge for it and casts まもり.
+// Plays a whole stage and tells how it went.
 import { LANE } from '../../src/config';
 import {
-    canSummon, canUpgradeWallet, castSpell, createBattle, manaFull, spellRating, startSpell, step, summon, upgradeWallet, type Battle, type DeckUnit
+    canSummon, canUpgradeWallet, castSpell, createBattle, enemyMagicSoon, guarded, manaFull, spellRating, startSpell, step, summon, upgradeWallet, type Battle, type DeckUnit
 } from '../../src/game/battle';
 import { stageEnemies, type Stage } from '../../src/game/stages';
 import { UNITS, unlockedUnits, type UnitId } from '../../src/game/units';
 import { BEATS, ELEMENTS, type Element } from '../../src/spell/elements';
-import { spellEffect } from '../../src/spell/effects';
+import { ENEMY_SPELLS } from '../../src/game/enemies';
+import { effectOfGroup, spellEffect } from '../../src/spell/effects';
 import type { SpellGrade } from '../../src/spell/grade';
 import { DECK_SIZE } from '../../src/storage';
 
@@ -24,6 +27,8 @@ export interface Play {
     strokes?: number;
     // Do nothing at all
     idle?: boolean;
+    // Cast まもり against the enemy's magic (default: with 'best' only)
+    guard?: boolean;
     level: number;
     maxMs?: number;
     // Called every step (to look into a battle)
@@ -55,6 +60,7 @@ function spellKanji(b: Battle, choose: Choose): string {
 
 export function autoplay(stage: Stage, play: Play): Battle {
     const choose = play.choose ?? 'best';
+    const guard = play.guard ?? choose === 'best';
     const b = createBattle(stage, deckFor(stage, play.level, choose));
     const dt = 1000 / 60;
     const maxMs = play.maxMs ?? 8 * 60 * 1000;
@@ -80,10 +86,29 @@ export function autoplay(stage: Stage, play: Play): Battle {
             if (ready && id !== 'purun' && !near) break;
         }
         if (play.spell && manaFull(b)) {
-            const kanji = spellKanji(b, choose);
-            startSpell(b);
-            castSpell(b, spellEffect(kanji, play.spell, play.strokes ?? 6), play.spell);
+            const strokes = play.strokes ?? 6;
+            if (guard && blockableComing(b, 0)) {
+                startSpell(b);
+                castSpell(b, effectOfGroup('metal', play.spell, strokes), play.spell);
+            } else if (!(guard && blockableComing(b, 12000))) {
+                const kanji = spellKanji(b, choose);
+                startSpell(b);
+                castSpell(b, spellEffect(kanji, play.spell, strokes), play.spell);
+            }
         }
     }
     return b;
+}
+
+// The enemy's magic that a barrier stops is told now (more: comes within this many ms after the
+// warning), and no barrier is up
+function blockableComing(b: Battle, more: number): boolean {
+    const m = b.stage.enemyMagic;
+    if (!m || guarded(b)) return false;
+    if (more === 0) {
+        const soon = enemyMagicSoon(b);
+        return !!soon && ENEMY_SPELLS[soon.spell].blockable;
+    }
+    const next = m.spells[b.enemyCasts % m.spells.length];
+    return ENEMY_SPELLS[next].blockable && b.enemyMagicAt - b.time <= more;
 }

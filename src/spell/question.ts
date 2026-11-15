@@ -17,6 +17,8 @@ export interface Choice {
     // the word to send in Morse code (src/morse/: FIRE1A)
     word?: string;
     group: SpellGroup;
+    // まもり, against the enemy's magic: whatever the kanji, it puts up the barrier of かね (group metal)
+    guard?: boolean;
     // How well it would work on the enemies there now (game/battle.ts spellRating)
     rating: 'good' | 'normal' | 'weak' | 'none';
 }

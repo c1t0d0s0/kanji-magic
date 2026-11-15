@@ -7,10 +7,10 @@ import { drawFly, drawShot, drawStomp } from '../art/fx';
 import { drawMark } from '../art/marks';
 import { shout, star } from '../art/parts';
 import type { Pose } from '../art/pose';
-import { LANE } from '../config';
+import { ENEMY_MAGIC, LANE } from '../config';
 import { drawSkyLife, drawWeather, paintScene } from '../art/scenery';
 import { sceneOf, type Scene } from './scenes';
-import type { Base, Battle, Fighter, Fx } from './battle';
+import { enemyMagicSoon, type Base, type Battle, type Fighter, type Fx } from './battle';
 
 export const FIELD_HEIGHT = 400;
 const GROUND = 330;
@@ -79,15 +79,23 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
     ctx.restore();
     const y = GROUND - r;
     if (f.shield > 0) {
-        ctx.strokeStyle = 'rgb(120 190 255 / 0.9)';
-        ctx.fillStyle = 'rgb(150 210 255 / 0.18)';
+        // Ours: the blue barrier of かね. The enemies: the pink one of ふとん バリア
+        const ally = f.side === 'ally';
+        ctx.strokeStyle = ally ? 'rgb(120 190 255 / 0.9)' : 'rgb(240 130 200 / 0.9)';
+        ctx.fillStyle = ally ? 'rgb(150 210 255 / 0.18)' : 'rgb(255 180 225 / 0.22)';
         ctx.lineWidth = 3;
         ctx.beginPath();
         ctx.arc(f.x, y, r + 8, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
     }
-    if (f.stopMs > 0) {
+    if (f.stopMs > 0 && f.side === 'ally') {
+        // Ours asleep (ねむりの きり): Zzz going up
+        for (let k = 0; k < 3; k++) {
+            const up = ((time / 700 + k / 3) % 1);
+            shout(ctx, 'Z', f.x + r * 0.4 + up * 14, y - r - 6 - up * 26, 12 + k * 4, '#6a4c93', 1 - up);
+        }
+    } else if (f.stopMs > 0) {
         // Bound by vines, with leaves
         ctx.strokeStyle = '#3f9b3a';
         ctx.lineWidth = 3;
@@ -261,6 +269,52 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             shout(ctx, `-${fx.amount}${big ? '!' : ''}`, fx.x, y, px, big ? '#d9480f' : small ? '#6c757d' : '#c92a2a', Math.min(1, fade * 2.5));
             break;
         }
+        case 'sleep': {
+            // ねむりの きり: a lilac mist over our side
+            const a = Math.min(1, t * 5) * fade;
+            const g = ctx.createLinearGradient(LANE.enemyBase + 200, 0, LANE.allyBase, 0);
+            g.addColorStop(0, 'rgb(190 160 230 / 0)');
+            g.addColorStop(0.4, `rgb(190 160 230 / ${0.55 * a})`);
+            g.addColorStop(1, `rgb(190 160 230 / ${0.65 * a})`);
+            ctx.fillStyle = g;
+            for (let k = 0; k < 6; k++) {
+                ctx.beginPath();
+                ctx.ellipse(LANE.enemyBase + 300 + k * 110 + Math.sin(fx.ms / 400 + k) * 15, GROUND - 40 - (k % 2) * 30, 110, 45, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            shout(ctx, 'ねむりの きり…', width / 2 + 120, 130 - t * 10, 34, '#6a4c93', Math.min(1, fade * 2));
+            break;
+        }
+        case 'meteor':
+            // まくら ながれぼし: pillows fall from the enemy's sky on our side
+            for (let k = 0; k < 7; k++) {
+                const at = Math.min(1, Math.max(0, t * 1.6 - k * 0.08));
+                if (at <= 0 || at >= 1) continue;
+                const x = 380 + k * 85 - (1 - at) * 220;
+                const y = -30 + at * (GROUND - 10);
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.rotate(at * 4 + k);
+                ctx.fillStyle = ['#ffc8dd', '#c8b6ff', '#bde0fe'][k % 3];
+                ctx.strokeStyle = '#7a5c9e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(-18, -12, 36, 24, 10);
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+                star(ctx, x - 22 * (1 - at), y - 26, 5, '#fff3b0', at * 6);
+            }
+            shout(ctx, 'まくら ながれぼし！', width / 2 + 120, 120 - t * 10, 34, '#7a2c4d', Math.min(1, fade * 2));
+            break;
+        case 'futon':
+            // ふとん バリア: the enemies are wrapped (each in pink: drawFighter)
+            shout(ctx, 'ふとん バリア！', width / 2 - 120, 120 - t * 10, 34, '#c2255c', Math.min(1, fade * 2));
+            break;
+        case 'blocked':
+            // The barrier (まもり) stopped it there
+            shout(ctx, 'ふせいだ！', fx.x, GROUND - 120 - ease(t) * 30, 40, '#1971c2', Math.min(1, fade * 2.5));
+            break;
         case 'fizzle':
             ctx.font = `bold 40px ${UI}`;
             ctx.fillStyle = `rgb(110 110 120 / ${fade})`;
@@ -268,6 +322,34 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             break;
     }
     ctx.restore();
+}
+
+// The enemy tower is about to cast: a magic circle over it that fills, faster near the end
+function drawCharge(ctx: CanvasRenderingContext2D, b: Battle) {
+    const soon = enemyMagicSoon(b);
+    if (!soon) return;
+    const part = 1 - soon.ms / ENEMY_MAGIC.warnMs;
+    const x = LANE.enemyBase + 40, y = GROUND - 270;
+    const pulse = 1 + 0.08 * Math.sin(b.time / (120 - 70 * part));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = 'rgb(60 20 90 / 0.45)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = 'rgb(255 255 255 / 0.35)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#e599f7';
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, -Math.PI / 2, -Math.PI / 2 + part * Math.PI * 2);
+    ctx.stroke();
+    star(ctx, 0, 0, 13, '#ffe066', b.time / 400);
+    ctx.restore();
+    shout(ctx, `${Math.ceil(soon.ms / 1000)}`, x + 44, y - 26, 22, '#862e9c', 1);
 }
 
 // Draws the whole field; the canvas is `scale` device pixels per unit of the field
@@ -282,6 +364,7 @@ export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: numb
     drawSkyLife(ctx, scene, w, clock);
     drawBase(ctx, b.enemyBase, LANE.enemyBase, false, b.time, scene);
     drawBase(ctx, b.allyBase, LANE.allyBase, true, b.time, scene);
+    drawCharge(ctx, b);
     // Bigger ones behind
     const order = [...b.fighters].sort((p, q) => q.size - p.size);
     const boosted = b.boostMs > 0;

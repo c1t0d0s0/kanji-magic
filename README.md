@@ -2,7 +2,7 @@
 
 小学1〜6年生向けの、横スクロールの拠点攻防ゲームです。出された漢字を手書きすると、魔法陣が発動して必殺技が出ます。要件は [requirements.md](requirements.md) にあります。
 
-要件の Phase 1〜6 をひととおり作ってあります（バトル・20ステージ・敵10種・ユニットの進化・魔法陣・魔法書・設定・効果音・クレジット）。数値の調整は、実際に遊んでもらいながら `src/config.ts` と `src/game/stages.ts` で行います。
+要件の Phase 1〜6 をひととおり作ってあります（バトル・20ステージ・敵10種・敵の魔法とまもりの魔法・ユニットの進化・魔法陣・魔法書・設定・効果音・クレジット）。数値の調整は、実際に遊んでもらいながら `src/config.ts` と `src/game/stages.ts` で行います。
 
 ## 動かしかた
 
@@ -27,7 +27,7 @@ Google タグを埋め込むときは、`config.example.js` を `config.js` に�
 - `src/spell/radicals.ts`：1,026字の部首（`radicals`）と部品（`components`）。`scripts/radicals.mjs` が KanjiVG から作る（手で直さない）
 - `src/spell/elements.ts`：漢字の属性（炎・水・木。部首 → 部品 → 意味の表の順に決める）と、相性の倍率
 - `src/spell/timer.ts`・`src/spell/question.ts`：書く時間（10〜30秒）と、出題（例文の□）
-- `src/components/SpellChoice.vue`：魔法陣の前の3択（属性のマーク・読み・いまの敵への効き目）
+- `src/components/SpellChoice.vue`：魔法陣の前の3択（属性のマーク・読み・いまの敵への効き目）。敵の魔法が来るときは4枚目の「まもり」
 - `src/components/SpellOverlay.vue`：魔法陣。制限時間・ルーンの光・自動の発動・お手本の表示・なぞりモード
 - `src/components/MorseOverlay.vue`・`src/morse/`：モールス信号の魔法（設定で選ぶ。タッチのできない PC 向け）。`code.ts`（A–Z・0–9 の符号）・`paddleRepeater.ts`（パドルの連続打鍵）・`keyer.ts`（パドル／電鍵とキーボード、文字の確定）・`spell.ts`（打つ言葉・制限時間・結果）。打鍵のしくみと符号の表は [Morse Master](https://github.com/c1t0d0s0/morse-master)（同じ作者、MIT）から移植した
 - `src/config.ts`：調整用の定数（`PERFECT_MARGIN`・制限時間・魔法の基本値・お金・魔力・レベル・報酬など）

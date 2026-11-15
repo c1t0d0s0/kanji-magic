@@ -40,6 +40,11 @@ describe('the word of a Morse spell', () => {
         for (const e of ELEMENTS) for (const c of WORDS[e]) expect(codeOf(c)).not.toBe('');
     });
 
+    it('has GUARD for まもり (against the enemy magic)', () => {
+        expect(morseWord('guard', () => 0)).toBe('GUARD0A');
+        for (const c of WORDS.guard) expect(codeOf(c)).not.toBe('');
+    });
+
     it('has more time for a longer word', () => {
         expect(morseSeconds('FIRE1A')).toBe(MORSE_SECONDS.base + 6 * MORSE_SECONDS.perChar);
         expect(morseSeconds('WATER2M')).toBeGreaterThan(morseSeconds('WOOD6X'));

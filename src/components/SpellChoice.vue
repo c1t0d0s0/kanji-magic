@@ -2,7 +2,8 @@
 // --- Before the magic circle: 3 kanji to choose from, each of a different element ---
 // A card shows the element and what the kanji reads in its phrase (never the kanji: that is the
 // answer), and how well it would work on the enemies there now. All in kana, as in the magic
-// circle. The time runs out after CHOICE_SECONDS: the best card is taken.
+// circle. The time runs out after CHOICE_SECONDS: the best card is taken. While the enemy's magic
+// is coming a 4th card is まもり: its kanji (any) puts up the barrier that stops it.
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { CHOICE_SECONDS } from '../config';
 import { kana } from '../learning/furi';
@@ -31,13 +32,15 @@ const RATING = {
     weak: { mark: '△', text: 'きかない' },
     none: { mark: '', text: 'てきが いないよ' }
 } as const;
-const SUPPORT: Partial<Record<SpellGroup, string>> = { metal: 'なかまを まもる', word: 'なかまを つよく する' };
+const SUPPORT: Partial<Record<SpellGroup, string>> = { metal: 'なかまと しろを まもる', word: 'なかまを つよく する' };
+const GUARD = 'てきの まほうを ふせぐ';
 
 const cards = computed(() => props.choices.map(c => {
-    const support = SUPPORT[c.group];
+    const support = c.guard ? GUARD : SUPPORT[c.group];
     return {
         group: c.group,
-        name: kana(SPELL_GROUPS[c.group].name),
+        name: c.guard ? 'まもり' : kana(SPELL_GROUPS[c.group].name),
+        guard: Boolean(c.guard),
         // The word in Morse code, or the reading of the kanji
         reading: c.word ?? c.question?.reibun.reading ?? '',
         morse: Boolean(c.word),
@@ -100,9 +103,9 @@ onBeforeUnmount(() => {
             <div class="choice-time" role="timer" :aria-label="`のこり ${seconds}びょう`">
                 <div class="choice-time-bar" :style="{ transform: `scaleX(${remaining / totalMs})` }"></div>
             </div>
-            <ul class="cards">
+            <ul class="cards" :class="{ 'is-four': cards.length > 3 }">
                 <li v-for="(c, i) in cards" :key="i">
-                    <button type="button" class="card-btn" :class="`is-${c.ratingKind}`" @click="pick(i)">
+                    <button type="button" class="card-btn" :class="[`is-${c.ratingKind}`, { 'is-guard': c.guard }]" @click="pick(i)">
                         <span class="card-head"><ElementMark :mark="c.group" :size="30" /> {{ c.name }}</span>
                         <span class="card-reading" :class="{ 'is-morse': c.morse }">{{ c.reading }}</span>
                         <span v-if="c.phrase" class="card-phrase">{{ c.phrase }}</span>
@@ -183,7 +186,14 @@ h2 {
     list-style: none;
 }
 
+/* 4 cards (まもり too): 2 by 2 on a phone, in one row when there is room */
+.cards.is-four {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+
 .card-btn {
+    /* The Morse word is sized to the card (cqi): it fits on one line */
+    container-type: inline-size;
     display: grid;
     justify-items: center;
     gap: 0.3rem;
@@ -212,6 +222,13 @@ h2 {
     opacity: 0.85;
 }
 
+/* まもり, against the enemy's magic that is coming */
+.card-btn.is-guard {
+    border-color: #74c0fc;
+    background: #e7f5ff;
+    box-shadow: 0 0 0 3px rgb(116 192 252 / 0.45);
+}
+
 .card-head {
     display: flex;
     flex-direction: column;
@@ -228,9 +245,18 @@ h2 {
 
 .card-reading.is-morse {
     font-family: var(--ui);
-    font-size: 1.5rem;
+    /* Never broken in two (WATE / R2M): smaller on a narrow card. 7 letters at most (WATER2M) */
+    font-size: clamp(0.8rem, 17cqi, 1.5rem);
     font-weight: 700;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+/* A phone: 3 cards in a row leave little room in each */
+@media (max-width: 30em) {
+    .card-btn {
+        padding-inline: 0.4rem;
+    }
 }
 
 .card-phrase {

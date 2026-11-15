@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET } from '../src/config';
+import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET } from '../src/config';
 import {
-    canSummon, castSpell, createBattle, manaFull, rewardOf, spellRating, starsOf, startSpell, step, summon, upgradeWallet, type Battle
+    canSummon, castSpell, createBattle, enemyMagicSoon, guarded, manaFull, rewardOf, spellRating, starsOf, startSpell, step, summon, upgradeWallet, type Battle
 } from '../src/game/battle';
 import { ENEMIES, ENEMY_IDS, SPLIT_INTO } from '../src/game/enemies';
 import { STAGES, stageById, type Stage } from '../src/game/stages';
 import { UNITS, formOf, levelPower, unitStats, unlockedUnits } from '../src/game/units';
-import { spellEffect } from '../src/spell/effects';
+import { effectOfGroup, spellEffect } from '../src/spell/effects';
 import type { Element } from '../src/spell/elements';
 import { autoplay } from './helpers/autoplay';
 
@@ -370,6 +370,85 @@ describe('the new enemies', () => {
         expect(ENEMIES.king.area).toBe(true);
         expect(ENEMIES.king.range).toBeGreaterThan(100);
     });
+});
+
+describe('the magic of the enemy tower', () => {
+    const levelAt = (id: number) => 1 + Math.floor((id - 1) / 2);
+    const magicStage = (spells: Stage['enemyMagic'] extends infer M ? M extends { spells: infer S } ? S : never : never): Stage =>
+        ({ ...quiet, enemyMagic: { from: 20, every: 30, spells } });
+
+    it('comes from the 6th stage on, never in the first 5', () => {
+        for (const s of STAGES) expect(!!s.enemyMagic, `stage ${s.id}`).toBe(s.id >= 6);
+        const b = createBattle(stageById(5), []);
+        run(b, 200000);
+        expect(b.enemyCasts).toBe(0);
+    });
+
+    it('is told ENEMY_MAGIC.warnMs before, then goes off, the spells in turn', () => {
+        const b = createBattle(magicStage(['sleep', 'meteor']), []);
+        run(b, 20000 - ENEMY_MAGIC.warnMs - 500);
+        expect(enemyMagicSoon(b)).toBeNull();
+        run(b, 1000);
+        expect(enemyMagicSoon(b)?.spell).toBe('sleep');
+        run(b, ENEMY_MAGIC.warnMs);
+        expect(b.enemyCasts).toBe(1);
+        run(b, 30000 - ENEMY_MAGIC.warnMs);
+        expect(enemyMagicSoon(b)?.spell).toBe('meteor');
+    });
+
+    it('ねむりの きり stops ours, but not those with a barrier', () => {
+        const b = createBattle(magicStage(['sleep']), [{ id: 'purun', level: 1 }]);
+        b.money = 1000;
+        summon(b, 'purun');
+        run(b, 19000);
+        // The first one gets the barrier; the second is sent after, with none
+        castSpell(b, effectOfGroup('metal', 'success', 6), 'success');
+        b.cooldowns.purun = 0;
+        summon(b, 'purun');
+        const [withBarrier, without] = b.fighters;
+        without.shield = 0;
+        run(b, 1100);
+        expect(b.enemyCasts).toBe(1);
+        expect(withBarrier.stopMs).toBe(0);
+        expect(without.stopMs).toBeGreaterThan(0);
+    });
+
+    it('まくら ながれぼし hurts our base, unless a barrier (まもり) is up; a block gives back gauge', () => {
+        const hit = createBattle(magicStage(['meteor']), []);
+        run(hit, 20100);
+        expect(hit.allyBase.hp).toBeCloseTo(hit.allyBase.max * (1 - ENEMY_MAGIC.meteor.base));
+        const kept = createBattle(magicStage(['meteor']), []);
+        run(kept, 15000);
+        castSpell(kept, effectOfGroup('metal', 'success', 6), 'success');
+        expect(guarded(kept)).toBe(true);
+        const mana = kept.mana;
+        run(kept, 5100);
+        expect(kept.allyBase.hp).toBe(kept.allyBase.max);
+        expect(kept.mana).toBeGreaterThan(mana + ENEMY_MAGIC.blockRefund * MANA_MAX - 1);
+    });
+
+    it('ふとん バリア puts a barrier on the enemies; a spell breaks it', () => {
+        const b = createBattle(magicStage(['futon']), []);
+        const e = enemyAt(b, 400);
+        e.speed = 0;
+        run(b, 20100);
+        expect(e.shield).toBe(Math.round(ENEMY_MAGIC.futon.shield * b.stage.power));
+        castSpell(b, spellEffect('火', 'success', 6), 'success');
+        expect(e.shield).toBe(0);
+        expect(e.hp).toBeLessThan(e.maxHp);
+    });
+
+    it('is won without まもり too; with it, more of our base is left', () => {
+        let guard = 0, none = 0;
+        for (const s of STAGES.filter(st => st.enemyMagic)) {
+            const g = autoplay(s, { spell: 'success', level: levelAt(s.id) });
+            const n = autoplay(s, { spell: 'success', level: levelAt(s.id), guard: false });
+            expect(n.result, `stage ${s.id}`).toBe('win');
+            guard += g.allyBase.hp / g.allyBase.max;
+            none += n.allyBase.hp / n.allyBase.max;
+        }
+        expect(guard).toBeGreaterThan(none);
+    }, 300000);
 });
 
 describe('rewards', () => {

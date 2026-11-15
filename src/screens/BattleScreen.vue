@@ -8,6 +8,9 @@
 // Stage 1 is the tutorial: a pointing hand shows the unit button, then the まほう button.
 // With Morse code (せってい: for a PC with no touch screen) a word is sent instead of a kanji
 // written (MorseOverlay); nothing to load then, and the kanji's records are not touched.
+// From the 6th stage the enemy tower casts magic, told some seconds before (over the field). While
+// a spell that a barrier stops is told, a 4th card comes: まもり, any kanji (or GUARD) that puts up
+// the barrier of かね.
 import Furi from '../components/Furi.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue';
 import SpellOverlay from '../components/SpellOverlay.vue';
@@ -17,14 +20,16 @@ import MuteButton from '../components/MuteButton.vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
 import { LANE, MANA_MAX, SPELL_SLOW, WALLET } from '../config';
 import {
-    canSummon, canUpgradeWallet, castSpell, spellRating, createBattle, manaFull, starsOf, startSpell, step, summon, upgradeWallet, walletOf, type BattleEvent
+    canSummon, canUpgradeWallet, castSpell, spellRating, createBattle, enemyMagicSoon, guarded, manaFull, starsOf, startSpell, step, summon, upgradeWallet,
+    walletOf, type BattleEvent
 } from '../game/battle';
+import { ENEMY_SPELLS, type EnemySpell } from '../game/enemies';
 import { createLoop } from '../game/loop';
 import { drawBattle, FIELD_HEIGHT } from '../game/render';
 import { stageById } from '../game/stages';
 import { formOf, unitStats, type UnitId } from '../game/units';
 import { plain } from '../learning/furi';
-import { pickChoices } from '../learning/picker';
+import { pickChoices, pickKanji } from '../learning/picker';
 import { effectOfGroup, elementOfGroup, spellEffect, spellGroup, type SpellEffect, type SpellGroup } from '../spell/effects';
 import { ELEMENTS } from '../spell/elements';
 import { morseWord } from '../morse/spell';
@@ -49,6 +54,8 @@ const question = shallowRef<Question | null>(null);
 // The word to send in Morse code, and its group
 const word = shallowRef<string | null>(null);
 let wordGroup: SpellGroup = 'fire';
+// The card chosen is まもり (its kanji, whatever it is, puts up the barrier)
+let guarding = false;
 // The 3 kanji to choose from, before the magic circle
 const choices = shallowRef<Choice[] | null>(null);
 const spells: SpellOutcome[] = [];
@@ -70,7 +77,9 @@ const hud = reactive({
     manaFull: false,
     ready: {} as Partial<Record<UnitId, boolean>>,
     cooldown: {} as Partial<Record<UnitId, number>>,
-    result: null as null | 'win' | 'lose'
+    result: null as null | 'win' | 'lose',
+    // The enemy's magic told now, and the seconds before it goes off
+    warn: null as null | { spell: EnemySpell; seconds: number; blockable: boolean; guarded: boolean }
 });
 
 // --- The tutorial ---
@@ -127,7 +136,9 @@ function fit() {
     draw();
 }
 
-const SOUND_OF: Record<BattleEvent, SoundName> = { summon: 'summon', hit: 'hit', fall: 'fall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose' };
+const SOUND_OF: Record<BattleEvent, SoundName> = {
+    summon: 'summon', hit: 'hit', fall: 'fall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose', enemyMagic: 'enemyMagic', blocked: 'blocked'
+};
 
 let finishing = false;
 function draw() {
@@ -152,6 +163,9 @@ function draw() {
         hud.cooldown[u.id] = (battle.cooldowns[u.id] ?? 0) / u.cooldownMs;
     }
     hud.result = battle.result;
+    const soon = enemyMagicSoon(battle);
+    if (soon && !hud.warn) play('warn');
+    hud.warn = soon ? { spell: soon.spell, seconds: Math.ceil(soon.ms / 1000), blockable: ENEMY_SPELLS[soon.spell].blockable, guarded: guarded(battle) } : null;
     if (tutorial.value === 'fight' && hud.manaFull && ready.value) tutorial.value = 'magic';
     if (battle.result && !question.value && !word.value && !choices.value && !finishing) end();
 }
@@ -195,6 +209,7 @@ function magic() {
     } else {
         choices.value = kanjiChoices();
     }
+    if (guardWanted()) choices.value = [...choices.value, guardChoice(choices.value)];
     loop.timeScale = SPELL_SLOW;
     play('open');
     if (tutorial.value === 'magic') tutorial.value = null;
@@ -217,13 +232,27 @@ function kanjiChoices(): Choice[] {
     });
 }
 
+// The enemy's magic that a barrier stops is told, and no barrier is up: まもり is a 4th card
+function guardWanted() {
+    const soon = enemyMagicSoon(battle);
+    return !!soon && ENEMY_SPELLS[soon.spell].blockable && !guarded(battle);
+}
+
+function guardChoice(others: Choice[]): Choice {
+    if (morse) return { word: morseWord('guard'), group: 'metal', rating: 'none', guard: true };
+    const taken = new Set([...used, ...others.flatMap(c => (c.question ? [c.question.item.kanji] : []))]);
+    const item = pickKanji({ grade: save.settings.grade, only: save.settings.only, progress, recent: save.recent, used: taken, strokesOf });
+    return { question: questionFor(item), group: 'metal', rating: 'none', guard: true };
+}
+
 // A card chosen: the magic circle opens with its kanji
 function chosen(i: number) {
     const c = choices.value?.[i];
     choices.value = null;
     if (!c) return closed();
+    guarding = Boolean(c.guard);
     if (c.word) {
-        wordGroup = c.group;
+        wordGroup = guarding ? 'metal' : c.group;
         word.value = c.word;
         return;
     }
@@ -244,7 +273,9 @@ function judged(outcome: SpellOutcome) {
         return;
     }
     const strokes = strokesOf(outcome.kanji);
-    pending = { effect: spellEffect(outcome.kanji, outcome.grade, strokes), grade: outcome.grade, group: spellGroup(outcome.kanji) };
+    pending = guarding
+        ? { effect: effectOfGroup('metal', outcome.grade, strokes), grade: outcome.grade, group: 'metal' }
+        : { effect: spellEffect(outcome.kanji, outcome.grade, strokes), grade: outcome.grade, group: spellGroup(outcome.kanji) };
     recordOutcome(outcome);
 }
 
@@ -355,6 +386,10 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
 
         <div ref="field" class="battle-field">
             <canvas ref="canvas" aria-label="戦いの 様子"></canvas>
+            <p v-if="hud.warn && !hud.result" class="enemy-warn" :class="{ 'is-guarded': hud.warn.guarded && hud.warn.blockable }" role="status">
+                <span class="enemy-warn-title"><Furi :text="`[敵|てき]の [魔法|まほう]が くる！ ${ENEMY_SPELLS[hud.warn.spell].name}（${hud.warn.seconds}）`" /></span>
+                <small><Furi :text="hud.warn.guarded && hud.warn.blockable ? 'バリアで [守|まも]っているよ' : hud.warn.blockable ? `${ENEMY_SPELLS[hud.warn.spell].does}。まもりで ふせげるよ` : `${ENEMY_SPELLS[hud.warn.spell].does}。[攻撃|こうげき]の [魔法|まほう]で やぶろう`" /></small>
+            </p>
             <p v-if="hud.result" class="battle-banner" :class="hud.result"><Furi :text="hud.result === 'win' ? '[勝|か]ち！' : '[負|ま]けちゃった…'" /></p>
         </div>
 
@@ -484,6 +519,66 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
 canvas {
     display: block;
     touch-action: manipulation;
+}
+
+/* The enemy's magic is coming: over the top of the field (not in the HUD: nothing under it moves) */
+.enemy-warn {
+    position: absolute;
+    top: 0.4rem;
+    left: 50%;
+    translate: -50% 0;
+    max-width: calc(100% - 1rem);
+    margin: 0;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.6rem;
+    background: rgb(74 30 110 / 0.88);
+    color: #fff;
+    text-align: center;
+    line-height: 1.35;
+    pointer-events: none;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+    animation: warn-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.enemy-warn-title {
+    display: block;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.enemy-warn small {
+    display: block;
+    font-size: 0.75rem;
+}
+
+.enemy-warn.is-guarded {
+    background: rgb(25 113 194 / 0.88);
+    animation: none;
+}
+
+@keyframes warn-pulse {
+    to { box-shadow: 0 0 0 4px rgb(229 153 247 / 0.7); }
+}
+
+/* A phone: the field is small; one line only (the まもり card says what it does) */
+@media (max-width: 40em) {
+    .enemy-warn {
+        top: 0.25rem;
+        padding: 0.1rem 0.6rem;
+        white-space: nowrap;
+    }
+
+    .enemy-warn-title {
+        font-size: 0.8rem;
+    }
+
+    .enemy-warn small {
+        display: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .enemy-warn { animation: none; }
 }
 
 .battle-banner {

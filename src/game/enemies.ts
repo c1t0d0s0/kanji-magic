@@ -52,3 +52,21 @@ export const SPLIT_INTO: EnemyId = 'zako';
 
 // The colour of an enemy of an element (the shape is that of its kind)
 export const ELEMENT_BODY = { fire: '#ff9a76', water: '#82b9ff', wood: '#93d16d' } as const;
+
+// --- The magic of the enemy tower (from the 6th stage: stages.ts enemyMagic, numbers ENEMY_MAGIC) ---
+// It is told ENEMY_MAGIC.warnMs before; まもり (the barrier of かね) stops the first two
+export type EnemySpell = 'sleep' | 'meteor' | 'futon';
+
+export interface EnemySpellInfo {
+    // With [kanji|reading] marks (learning/furi.ts)
+    name: string;
+    does: string;
+    // The barrier stops it
+    blockable: boolean;
+}
+
+export const ENEMY_SPELLS: Record<EnemySpell, EnemySpellInfo> = {
+    sleep: { name: 'ねむりの きり', does: '[味方|みかた]が しばらく [止|と]まる', blockable: true },
+    meteor: { name: 'まくら ながれぼし', does: '[味方|みかた]と [城|しろ]に ダメージ', blockable: true },
+    futon: { name: 'ふとん バリア', does: '[敵|てき]が バリアで [守|まも]られる', blockable: false }
+};

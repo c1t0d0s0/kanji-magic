@@ -4,12 +4,12 @@
 // play whole stages). Our base is on the right, the enemy's on the left; our units go left.
 // What happens for the sound and the pictures is told by `events` (emptied by the screen) and `fx`.
 import {
-    BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
+    BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
 } from '../config';
 import type { SpellEffect, SpellGroup } from '../spell/effects';
 import { ELEMENTS, affinity, type Element } from '../spell/elements';
 import type { SpellGrade } from '../spell/grade';
-import { ELEMENT_BODY, ENEMIES, SPLIT_INTO, type EnemyId } from './enemies';
+import { ELEMENT_BODY, ENEMIES, ENEMY_SPELLS, SPLIT_INTO, type EnemyId, type EnemySpell } from './enemies';
 import type { Spawn, Stage } from './stages';
 import { formOf, unitStats, type UnitId } from './units';
 
@@ -60,8 +60,11 @@ export interface Fighter {
 // fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
 // spark: a hit on the element it beats; good / weak: a spell that worked well / not well on most;
 // change: the boss changed its element; damage: the harm a spell did to one enemy (a number over it);
-// heal: an enemy healed by a lullaby; split: a ふたご fell in two
-export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect' | 'damage' | 'heal' | 'split';
+// heal: an enemy healed by a lullaby; split: a ふたご fell in two; sleep / meteor / futon: the enemy
+// tower's magic went off; blocked: the barrier stopped it there
+export type FxKind =
+    | SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect' | 'damage' | 'heal' | 'split'
+    | EnemySpell | 'blocked';
 
 // Who made it (for the picture only)
 export interface FxWho {
@@ -89,7 +92,7 @@ export interface Fx {
 
 const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element });
 
-export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose';
+export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'enemyMagic' | 'blocked';
 
 export interface Base {
     hp: number;
@@ -122,6 +125,9 @@ export interface Battle {
     boostRate: number;
     shieldMs: number;
     shieldAmount: number;
+    // The enemy tower's magic: how many it has cast, and when (ms of the battle) the next goes off
+    enemyCasts: number;
+    enemyMagicAt: number;
     result: null | 'win' | 'lose';
     fx: Fx[];
     events: BattleEvent[];
@@ -147,6 +153,8 @@ export function createBattle(stage: Stage, deck: readonly DeckUnit[]): Battle {
         boostRate: 1,
         shieldMs: 0,
         shieldAmount: 0,
+        enemyCasts: 0,
+        enemyMagicAt: stage.enemyMagic ? stage.enemyMagic.from * 1000 : Infinity,
         result: null,
         fx: [],
         events: [],
@@ -320,6 +328,60 @@ export function spellRating(b: Battle, element: Element | null): 'good' | 'norma
     return mean >= 1.5 ? 'good' : mean <= 0.75 ? 'weak' : 'normal';
 }
 
+// --- The enemy tower's magic ---
+// The next spell and the ms before it goes off, from ENEMY_MAGIC.warnMs before (null: none soon)
+export function enemyMagicSoon(b: Battle): { spell: EnemySpell; ms: number } | null {
+    const m = b.stage.enemyMagic;
+    if (!m || b.result) return null;
+    const ms = b.enemyMagicAt - b.time;
+    if (ms > ENEMY_MAGIC.warnMs) return null;
+    return { spell: m.spells[b.enemyCasts % m.spells.length], ms: Math.max(0, ms) };
+}
+
+// The barrier of かね (まもり) lasts: ours and our base are kept from the enemy's magic
+export const guarded = (b: Battle) => b.shieldMs > 0;
+
+function enemyCast(b: Battle, spell: EnemySpell) {
+    const middle = (LANE.enemyBase + LANE.allyBase) / 2;
+    // Where the barrier stopped it: one ふせいだ！ over the middle of them
+    const stopped: number[] = [];
+    const block = (x: number) => stopped.push(x);
+    switch (spell) {
+        case 'sleep':
+            for (const f of allies(b)) {
+                if (f.shield > 0) block(f.x);
+                else f.stopMs = Math.max(f.stopMs, ENEMY_MAGIC.sleep.ms);
+            }
+            break;
+        case 'meteor':
+            for (const f of allies(b)) {
+                const before = f.shield;
+                harm(f, f.maxHp * ENEMY_MAGIC.meteor.unit);
+                f.hurtMs = Math.max(f.hurtMs, SPELL_HURT_MS);
+                if (before > 0) block(f.x);
+            }
+            if (guarded(b)) block(LANE.allyBase - 40);
+            else {
+                b.allyBase.hp = Math.max(0, b.allyBase.hp - b.allyBase.max * ENEMY_MAGIC.meteor.base);
+                b.allyBase.hurtMs = SPELL_HURT_MS;
+            }
+            break;
+        case 'futon': {
+            const shield = Math.round(ENEMY_MAGIC.futon.shield * b.stage.power);
+            for (const f of enemies(b)) f.shield = Math.max(f.shield, shield);
+            break;
+        }
+    }
+    b.fx.push({ kind: spell, x: middle, ms: 0, total: spell === 'sleep' ? ENEMY_MAGIC.sleep.ms : 1600 });
+    b.events.push('enemyMagic');
+    const blocked = stopped.length > 0;
+    if (blocked) b.fx.push({ kind: 'blocked', x: stopped.reduce((a, x) => a + x, 0) / stopped.length, ms: 0, total: 1400 });
+    if (blocked && ENEMY_SPELLS[spell].blockable) {
+        b.events.push('blocked');
+        b.mana = Math.min(MANA_MAX, b.mana + ENEMY_MAGIC.blockRefund * MANA_MAX);
+    }
+}
+
 // --- One step of the battle ---
 function nearestFoe(b: Battle, f: Fighter) {
     let best: Fighter | null = null;
@@ -414,6 +476,13 @@ export function step(b: Battle, dt: number) {
             b.spawned[i]++;
         }
     });
+
+    const magic = b.stage.enemyMagic;
+    if (magic && b.time >= b.enemyMagicAt) {
+        enemyCast(b, magic.spells[b.enemyCasts % magic.spells.length]);
+        b.enemyCasts++;
+        b.enemyMagicAt += magic.every * 1000;
+    }
 
     for (const f of b.fighters) {
         if (!f.cycle) continue;
