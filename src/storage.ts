@@ -22,7 +22,18 @@ export interface Settings {
     // 0 to 1
     volume: number;
     muted: boolean;
+    // How a spell is cast: a kanji written by hand, or a word sent in Morse code (for a PC with no
+    // touch screen: src/morse/)
+    input: InputMethod;
+    // Morse: two keys (パドル: dot and dash) or one key held short or long (電鍵)
+    keyer: Keyer;
+    // Morse: 初級 shows the code under each letter, 上級 does not
+    morseLevel: MorseLevel;
 }
+
+export type InputMethod = 'kanji' | 'morse';
+export type Keyer = 'paddle' | 'straight';
+export type MorseLevel = 'easy' | 'hard';
 
 export interface StageRecord {
     cleared: boolean;
@@ -47,7 +58,7 @@ export interface SaveData {
 export function defaultSave(): SaveData {
     return {
         version: SAVE_VERSION,
-        settings: { grade: 1, only: false, strokeOrder: false, trace: false, volume: 0.7, muted: false },
+        settings: { grade: 1, only: false, strokeOrder: false, trace: false, volume: 0.7, muted: false, input: 'kanji', keyer: 'paddle', morseLevel: 'easy' },
         stages: {},
         units: Object.fromEntries(UNIT_IDS.map(id => [id, 1])) as Record<UnitId, number>,
         deck: ['purun', 'kaeru'],
@@ -64,6 +75,7 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const num = (v: unknown, fallback: number, min: number, max: number) =>
     typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
 const bool = (v: unknown, fallback: boolean) => (typeof v === 'boolean' ? v : fallback);
+const oneOf = <T extends string>(v: unknown, list: readonly T[], fallback: T): T => (list.includes(v as T) ? (v as T) : fallback);
 
 // An older save into the current shape (none yet: version 1 is the first)
 function migrate(raw: Record<string, unknown>): Record<string, unknown> {
@@ -90,7 +102,10 @@ export function parseSave(text: string | null): SaveData {
         strokeOrder: bool(s.strokeOrder, d.settings.strokeOrder),
         trace: bool(s.trace, d.settings.trace),
         volume: num(s.volume, d.settings.volume, 0, 1),
-        muted: bool(s.muted, d.settings.muted)
+        muted: bool(s.muted, d.settings.muted),
+        input: oneOf(s.input, ['kanji', 'morse'] as const, d.settings.input),
+        keyer: oneOf(s.keyer, ['paddle', 'straight'] as const, d.settings.keyer),
+        morseLevel: oneOf(s.morseLevel, ['easy', 'hard'] as const, d.settings.morseLevel)
     };
     const stages: Record<number, StageRecord> = {};
     if (isObject(r.stages)) {

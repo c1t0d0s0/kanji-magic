@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// --- せってい: the grade and which kanji, the magic circle, the sound, and erasing the data ---
+// --- せってい: the grade and which kanji, how spells are cast (a kanji by hand or Morse code), the
+// magic circle, the sound, and erasing the data ---
 // Saved at each change (requirements 10)
 import Furi from '../components/Furi.vue';
 import { ref } from 'vue';
@@ -31,12 +32,13 @@ function onConfirmClose() {
 </script>
 
 <template>
-    <main class="screen">
+    <main class="screen settings">
         <header class="screen-head">
             <button type="button" class="btn" @click="go('title')"><Furi text="[戻|もど]る" /></button>
             <h1><Furi text="[設定|せってい]" /></h1>
         </header>
 
+        <div class="settings-cards">
         <section class="card">
             <h2><Furi text="[学年|がくねん]" /></h2>
             <div class="row" role="group" aria-label="学年">
@@ -50,6 +52,30 @@ function onConfirmClose() {
         </section>
 
         <section class="card">
+            <h2><Furi text="[魔法|まほう]の [使|つか]い[方|かた]" /></h2>
+            <div class="row">
+                <label class="check"><input type="radio" name="input" :checked="save.settings.input === 'kanji'" @change="changeSettings({ input: 'kanji' })"><Furi text="[漢字|かんじ]を [手書|てが]き" /></label>
+                <label class="check"><input type="radio" name="input" :checked="save.settings.input === 'morse'" @change="changeSettings({ input: 'morse' })"><Furi text="モールス[信号|しんごう]（キーボード）" /></label>
+            </div>
+            <p class="note"><Furi text="タッチの できない パソコンでは、モールス[信号|しんごう]で [英語|えいご]と [数字|すうじ]を [送|おく]って [魔法|まほう]を [使|つか]えるよ" /></p>
+            <template v-if="save.settings.input === 'morse'">
+                <h3><Furi text="キー" /></h3>
+                <div class="row">
+                    <label class="check"><input type="radio" name="keyer" :checked="save.settings.keyer === 'paddle'" @change="changeSettings({ keyer: 'paddle' })">パドル</label>
+                    <label class="check"><input type="radio" name="keyer" :checked="save.settings.keyer === 'straight'" @change="changeSettings({ keyer: 'straight' })"><Furi text="[電鍵|でんけん]" /></label>
+                </div>
+                <p class="note" v-if="save.settings.keyer === 'paddle'"><Furi text="J・F キーで トン（・）、K・D キーで ツー（－）。[押|お]し[続|つづ]けると くり[返|かえ]すよ" /></p>
+                <p class="note" v-else><Furi text="スペースキーを [短|みじか]く [押|お]すと トン（・）、[長|なが]く [押|お]すと ツー（－）" /></p>
+                <h3><Furi text="レベル" /></h3>
+                <div class="row">
+                    <label class="check"><input type="radio" name="morseLevel" :checked="save.settings.morseLevel === 'easy'" @change="changeSettings({ morseLevel: 'easy' })"><Furi text="[初級|しょきゅう]" /></label>
+                    <label class="check"><input type="radio" name="morseLevel" :checked="save.settings.morseLevel === 'hard'" @change="changeSettings({ morseLevel: 'hard' })"><Furi text="[上級|じょうきゅう]" /></label>
+                </div>
+                <p class="note"><Furi :text="save.settings.morseLevel === 'easy' ? '[文字|もじ]の [下|した]に モールス[信号|しんごう]（・－）が [出|で]るよ' : 'ヒントは [出|で]ないよ'" /></p>
+            </template>
+        </section>
+
+        <section v-if="save.settings.input === 'kanji'" class="card">
             <h2><Furi text="[魔法陣|まほうじん]" /></h2>
             <label class="check"><input type="checkbox" :checked="save.settings.strokeOrder" @change="changeSettings({ strokeOrder: ($event.target as HTMLInputElement).checked })"><Furi text="[書|か]き[順|じゅん]も [見|み]る" /></label>
             <p class="note"><Furi text="オンに すると、[書|か]き[順|じゅん]が [違|ちが]うと「せいこう」に ならないよ" /></p>
@@ -71,6 +97,8 @@ function onConfirmClose() {
             <p v-if="erased" role="status"><Furi text="[消|け]したよ。[初|はじ]めから [遊|あそ]べるよ" /></p>
         </section>
 
+        </div>
+
         <dialog ref="confirmDialog" class="confirm" aria-labelledby="confirm-title" @close="onConfirmClose">
             <h2 id="confirm-title"><Furi text="[本当|ほんとう]に [消|け]しても いい？" /></h2>
             <p><Furi text="ステージ・[仲間|なかま]・[魔法|まほう]の [本|ほん]が [全部|ぜんぶ] [消|き]えるよ。[元|もと]に [戻|もど]せないよ" /></p>
@@ -83,10 +111,39 @@ function onConfirmClose() {
 </template>
 
 <style scoped>
+.settings-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* On a wide screen (a PC): the cards in two columns, so that it fits without scrolling */
+@media (min-width: 64em) {
+    .settings {
+        max-width: 72rem;
+    }
+
+    .settings-cards {
+        display: block;
+        columns: 2;
+        column-gap: 1rem;
+    }
+
+    .settings-cards > .card {
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+}
+
 h2 {
     font-family: var(--hand);
     font-size: 1.2rem;
     margin-bottom: 0.4rem;
+}
+
+h3 {
+    margin: 0.5rem 0 0;
+    font-size: 1rem;
 }
 
 .row {

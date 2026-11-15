@@ -5,10 +5,13 @@
 // ready the まほう button says じゅんびちゅう. While the magic circle is open the battle goes at
 // SPELL_SLOW; the spell goes off when it is judged, and the battle is back to speed when it closes.
 // Stage 1 is the tutorial: a pointing hand shows the unit button, then the まほう button.
+// With Morse code (せってい: for a PC with no touch screen) a word is sent instead of a kanji
+// written (MorseOverlay); nothing to load then, and the kanji's records are not touched.
 import Furi from '../components/Furi.vue';
 import { computed, onBeforeUnmount, onMounted, reactive, ref, shallowRef } from 'vue';
 import SpellOverlay from '../components/SpellOverlay.vue';
 import SpellChoice from '../components/SpellChoice.vue';
+import MorseOverlay from '../components/MorseOverlay.vue';
 import MuteButton from '../components/MuteButton.vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
 import { LANE, MANA_MAX, SPELL_SLOW } from '../config';
@@ -21,7 +24,9 @@ import { stageById } from '../game/stages';
 import { formOf, unitStats, type UnitId } from '../game/units';
 import { plain } from '../learning/furi';
 import { pickChoices } from '../learning/picker';
-import { elementOfGroup, spellEffect, spellGroup } from '../spell/effects';
+import { effectOfGroup, elementOfGroup, spellEffect, spellGroup, type SpellGroup } from '../spell/effects';
+import { ELEMENTS } from '../spell/elements';
+import { morseWord } from '../morse/spell';
 import type { SpellOutcome } from '../spell/grade';
 import { questionFor, type Choice, type Question } from '../spell/question';
 import { loadTegaki, type TegakiKit } from '../spell/tegaki';
@@ -34,7 +39,15 @@ const deck = save.deck.map(id => unitStats(id, save.units[id]));
 
 const kit = shallowRef<TegakiKit | null>(null);
 const loadFailed = ref(false);
+// The way of this battle (the せってい is not changed in a battle)
+const morse = save.settings.input === 'morse';
+const morseSettings = { keyer: save.settings.keyer, level: save.settings.morseLevel };
+// The まほう button can be pressed (Morse needs nothing loaded)
+const ready = computed(() => morse || kit.value !== null);
 const question = shallowRef<Question | null>(null);
+// The word to send in Morse code, and its group
+const word = shallowRef<string | null>(null);
+let wordGroup: SpellGroup = 'fire';
 // The 3 kanji to choose from, before the magic circle
 const choices = shallowRef<Choice[] | null>(null);
 const spells: SpellOutcome[] = [];
@@ -130,8 +143,8 @@ function draw() {
         hud.cooldown[u.id] = (battle.cooldowns[u.id] ?? 0) / u.cooldownMs;
     }
     hud.result = battle.result;
-    if (tutorial.value === 'fight' && hud.manaFull && kit.value) tutorial.value = 'magic';
-    if (battle.result && !question.value && !choices.value && !finishing) end();
+    if (tutorial.value === 'fight' && hud.manaFull && ready.value) tutorial.value = 'magic';
+    if (battle.result && !question.value && !word.value && !choices.value && !finishing) end();
 }
 
 const loop = createLoop(dt => step(battle, dt), draw);
@@ -153,7 +166,24 @@ function strokesOf(kanji: string) {
 
 function magic() {
     unlockAudio();
-    if (!kit.value || question.value || choices.value || !startSpell(battle)) return;
+    if (!ready.value || question.value || word.value || choices.value || !startSpell(battle)) return;
+    if (morse) {
+        // One word of each element, in no set order
+        const elements = [...ELEMENTS];
+        for (let i = elements.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [elements[i], elements[j]] = [elements[j], elements[i]];
+        }
+        choices.value = elements.map(e => ({ word: morseWord(e), group: e, rating: spellRating(battle, e) }));
+    } else {
+        choices.value = kanjiChoices();
+    }
+    loop.timeScale = SPELL_SLOW;
+    play('open');
+    if (tutorial.value === 'magic') tutorial.value = null;
+}
+
+function kanjiChoices(): Choice[] {
     const items = pickChoices({
         grade: save.settings.grade,
         only: save.settings.only,
@@ -162,15 +192,12 @@ function magic() {
         used,
         strokesOf
     }, spellGroup);
-    choices.value = items.map(item => {
+    return items.map(item => {
         const group = spellGroup(item.kanji);
         const element = elementOfGroup(group);
         const rating = group === 'metal' || group === 'word' ? 'none' : element ? spellRating(battle, element) : 'normal';
         return { question: questionFor(item), group, rating };
     });
-    loop.timeScale = SPELL_SLOW;
-    play('open');
-    if (tutorial.value === 'magic') tutorial.value = null;
 }
 
 // A card chosen: the magic circle opens with its kanji
@@ -178,6 +205,12 @@ function chosen(i: number) {
     const c = choices.value?.[i];
     choices.value = null;
     if (!c) return closed();
+    if (c.word) {
+        wordGroup = c.group;
+        word.value = c.word;
+        return;
+    }
+    if (!c.question) return closed();
     used.add(c.question.item.kanji);
     question.value = c.question;
 }
@@ -185,6 +218,13 @@ function chosen(i: number) {
 // The spell is judged: it goes off now (the battle still slow behind the circle)
 function judged(outcome: SpellOutcome) {
     spells.push(outcome);
+    if (outcome.morse) {
+        // The letters of the word for the strokes; not a kanji: no records of it
+        castSpell(battle, effectOfGroup(wordGroup, outcome.grade, outcome.morse.length), outcome.grade);
+        play(outcome.grade);
+        if (outcome.grade !== 'fail') setTimeout(() => play(wordGroup), 250);
+        return;
+    }
     const strokes = strokesOf(outcome.kanji);
     castSpell(battle, spellEffect(outcome.kanji, outcome.grade, strokes), outcome.grade);
     play(outcome.grade);
@@ -194,6 +234,7 @@ function judged(outcome: SpellOutcome) {
 
 function closed() {
     question.value = null;
+    word.value = null;
     loop.timeScale = 1;
     if (stage.tutorial && !save.tutorialDone && tutorial.value === null) {
         tutorial.value = 'cheer';
@@ -253,7 +294,7 @@ async function load() {
 
 // The hidden page (another app): the battle waits
 function onVisibility() {
-    if (document.hidden && !paused.value && !question.value && !choices.value && !battle.result) pause();
+    if (document.hidden && !paused.value && !question.value && !word.value && !choices.value && !battle.result) pause();
 }
 
 onMounted(() => {
@@ -264,7 +305,7 @@ onMounted(() => {
     window.addEventListener('resize', fit);
     fit();
     loop.start();
-    void load();
+    if (!morse) void load();
     document.addEventListener('visibilitychange', onVisibility);
 });
 onBeforeUnmount(() => {
@@ -305,8 +346,8 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
                     <span class="mana-text"><Furi text="[魔力|まりょく]" /> {{ Math.floor(hud.mana * 100) }}%</span>
                 </div>
                 <div class="pointer-anchor">
-                    <button type="button" class="btn magic-btn" :class="{ 'is-full': hud.manaFull && kit }" :disabled="!kit || !hud.manaFull || !!question || !!choices" @click="magic">
-                        <Furi :text="kit ? '[魔法|まほう]' : '[準備中|じゅんびちゅう]'" />
+                    <button type="button" class="btn magic-btn" :class="{ 'is-full': hud.manaFull && ready }" :disabled="!ready || !hud.manaFull || !!question || !!word || !!choices" @click="magic">
+                        <Furi :text="ready ? '[魔法|まほう]' : '[準備中|じゅんびちゅう]'" />
                     </button>
                     <span v-if="tutorial === 'magic'" class="pointer" aria-hidden="true">👆</span>
                 </div>
@@ -337,6 +378,7 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
         </dialog>
 
         <SpellChoice v-if="choices" :choices="choices" @pick="chosen" />
+        <MorseOverlay v-if="word" :word="word" :settings="morseSettings" @judged="judged" @done="closed" />
         <SpellOverlay v-if="question && kit" :kit="kit" :question="question"
             :settings="{ strokeOrder: save.settings.strokeOrder, trace: save.settings.trace }" @judged="judged" @done="closed" />
     </main>

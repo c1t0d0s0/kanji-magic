@@ -46,6 +46,20 @@ export const AFFINITY = {
     spell: { strong: 2, weak: 0.5 },
     unit: { strong: 2, weak: 0.5 }
 } as const;
+// --- The spells sent in Morse code (src/morse/) ---
+// The speed: a dot is 1200 / WPM ms (100 ms), a dash 3 dots. Slow, for children
+export const MORSE_WPM = 12;
+// 電鍵: a key held longer than this many dots is a dash (morse-master TappingQuiz)
+export const MORSE_DASH_AT = 1.8;
+// A letter is taken after no keying for this many dots, counted from the release of the 電鍵 or
+// from the start of the paddle's last symbol (so after a dash, 2 more: its length). morse-master
+// FreeKeyer has 3.5 and 5.5; a little more here, for children (Enter takes it at once)
+export const MORSE_LETTER_GAP = { dot: 5, dash: 7 };
+// The time to send a word: base + each letter (FIRE1A: 30 s). Numbers are 5 symbols long
+export const MORSE_SECONDS = { base: 6, perChar: 4 };
+// The wrong letters (they are sent again) still allowed for かんぺき and せいこう
+export const MORSE_MISSES = { perfect: 0, success: 2 };
+
 // The 3 kanji to choose from: the time to choose (then the best one is taken)
 export const CHOICE_SECONDS = 15;
 // The boss of the last stage changes its element this often

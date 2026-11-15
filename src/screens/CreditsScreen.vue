@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// --- クレジット (requirements 9, 11): KanjiVG and kanji-quiz, with their licences ---
+// --- クレジット (requirements 9, 11): KanjiVG, kanji-quiz and Morse Master, with their licences ---
 // The notice of KanjiVG is the LICENSE of kanjivg.ts (loaded with it, apart from the first page)
 import Furi from '../components/Furi.vue';
 import { onMounted, shallowRef } from 'vue';
@@ -39,6 +39,11 @@ onMounted(async () => {
             <h2><Furi text="[手書|てが]きの [判定|はんてい]" /></h2>
             <p><a href="https://github.com/c1t0d0s0/kanji-quiz" target="_blank" rel="noopener">kanji-quiz</a>（MIT ライセンス）</p>
             <p class="note"><Furi text="[書|か]いた [字|じ]の [判定|はんてい]や、[例文|れいぶん]・[配当表|はいとうひょう]の データを [使|つか]っています" /></p>
+        </section>
+        <section class="card">
+            <h2><Furi text="モールス[信号|しんごう]" /></h2>
+            <p><a href="https://github.com/c1t0d0s0/morse-master" target="_blank" rel="noopener">Morse Master</a>（MIT ライセンス）</p>
+            <p class="note"><Furi text="パドル・[電鍵|でんけん]の [打|う]ち[方|かた]と、モールス[信号|しんごう]の [表|ひょう]を [使|つか]っています" /></p>
         </section>
         <section class="card">
             <h2>この ゲーム</h2>

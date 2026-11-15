@@ -106,3 +106,51 @@ export function play(name: SoundName) {
         case 'wonder': tone(200, 0, 0.7, 'sine', 0.25, 900); noise(0.3, 0.5, 0.2, 1500); break;
     }
 }
+
+// --- The side tone of the Morse key (src/morse/): sounds while the key is down ---
+// From morse-master src/audio/morseAudioEngine.ts (startManualTone / stopManualTone): a sine with
+// 5 ms ramps so the key makes no click
+const SIDE_TONE_HZ = 650;
+let side: { o: OscillatorNode; g: GainNode } | null = null;
+
+export function sideToneOn() {
+    sideToneOff();
+    if (volume <= 0 || !audio() || !ctx || !master || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(SIDE_TONE_HZ, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.005);
+    o.connect(g).connect(master);
+    o.start(t);
+    side = { o, g };
+}
+
+export function sideToneOff() {
+    if (!side || !ctx) return;
+    const { o, g } = side;
+    side = null;
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(g.gain.value, t);
+    g.gain.linearRampToValueAtTime(0.0001, t + 0.005);
+    o.stop(t + 0.02);
+}
+
+// One dot or dash (the paddle sends them by itself)
+export function sideTone(ms: number) {
+    if (volume <= 0 || !audio() || !ctx || !master || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(SIDE_TONE_HZ, t);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.35, t + 0.005);
+    g.gain.setValueAtTime(0.35, t + ms / 1000);
+    g.gain.linearRampToValueAtTime(0.0001, t + ms / 1000 + 0.005);
+    o.connect(g).connect(master);
+    o.start(t);
+    o.stop(t + ms / 1000 + 0.02);
+}

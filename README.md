@@ -1,4 +1,4 @@
-# 漢字魔法大戦争
+# KM魔法大戦争
 
 小学1〜6年生向けの、横スクロールの拠点攻防ゲームです。出された漢字を手書きすると、魔法陣が発動して必殺技が出ます。要件は [requirements.md](requirements.md) にあります。
 
@@ -29,6 +29,7 @@ Google タグを埋め込むときは、`config.example.js` を `config.js` に�
 - `src/spell/timer.ts`・`src/spell/question.ts`：書く時間（10〜30秒）と、出題（例文の□）
 - `src/components/SpellChoice.vue`：魔法陣の前の3択（属性のマーク・読み・いまの敵への効き目）
 - `src/components/SpellOverlay.vue`：魔法陣。制限時間・ルーンの光・自動の発動・お手本の表示・なぞりモード
+- `src/components/MorseOverlay.vue`・`src/morse/`：モールス信号の魔法（設定で選ぶ。タッチのできない PC 向け）。`code.ts`（A–Z・0–9 の符号）・`paddleRepeater.ts`（パドルの連続打鍵）・`keyer.ts`（パドル／電鍵とキーボード、文字の確定）・`spell.ts`（打つ言葉・制限時間・結果）。打鍵のしくみと符号の表は [Morse Master](https://github.com/c1t0d0s0/morse-master)（同じ作者、MIT）から移植した
 - `src/config.ts`：調整用の定数（`PERFECT_MARGIN`・制限時間・魔法の基本値・お金・魔力・レベル・報酬など）
 - `src/game/`：バトル本体（Vue に依存しない）。`battle.ts`（状態と1ステップの処理）・`loop.ts`（60Hz の固定ステップ）・`render.ts`（Canvas への描画）・`units.ts`・`enemies.ts`・`stages.ts`（10ステージのデータ）
 - `src/art/`：キャラクター（へんてこ生き物・わすれんぼう）・きのこハウス・まくらタワー・ふっとびなどの絵。画像ファイルは使わず、Canvas 2D のパスで描く（Vue に依存しない）。`characters.ts` の `ART` が種類ごとの描画関数で、HTML 側では `src/components/CharacterIcon.vue` から使う
@@ -45,4 +46,5 @@ Google タグを埋め込むときは、`config.example.js` を `config.js` に�
 - **KanjiVG**：`src/vendor/kanji-quiz/src/data/kanjivg.ts`・`src/vendor/kanji-quiz/src/data/lookalikes.ts`・`src/spell/radicals.ts` は KanjiVG を元にしたデータで、**CC BY-SA 3.0** です
   - KanjiVG © Ulrich Apel — https://kanjivg.tagaini.net
   - ライセンス：Creative Commons Attribution-Share Alike 3.0（https://creativecommons.org/licenses/by-sa/3.0/）
+- **Morse Master**：`src/morse/paddleRepeater.ts`・`src/morse/code.ts`・`src/morse/keyer.ts`・`src/sound.ts` の側音・`tests/paddleRepeater.test.ts` は Morse Master（https://github.com/c1t0d0s0/morse-master）を元にしていて、MIT です（作者が同じ）
 - **kanji-quiz**：`src/vendor/kanji-quiz/` のファイルは kanji-quiz（https://github.com/c1t0d0s0/kanji-quiz）のもので、MIT です（[src/vendor/kanji-quiz/LICENSE](src/vendor/kanji-quiz/LICENSE)）

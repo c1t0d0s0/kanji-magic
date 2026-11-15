@@ -38,9 +38,11 @@ const cards = computed(() => props.choices.map(c => {
     return {
         group: c.group,
         name: kana(SPELL_GROUPS[c.group].name),
-        reading: c.question.reibun.reading,
+        // The word in Morse code, or the reading of the kanji
+        reading: c.word ?? c.question?.reibun.reading ?? '',
+        morse: Boolean(c.word),
         // The phrase, the kanji as □ (its reading is the big word on the card)
-        phrase: `${c.question.reibun.before}□${c.question.reibun.after}`,
+        phrase: c.question ? `${c.question.reibun.before}□${c.question.reibun.after}` : '',
         rating: support ? null : RATING[c.rating],
         ratingKind: support ? 'support' : c.rating,
         support
@@ -102,8 +104,8 @@ onBeforeUnmount(() => {
                 <li v-for="(c, i) in cards" :key="i">
                     <button type="button" class="card-btn" :class="`is-${c.ratingKind}`" @click="pick(i)">
                         <span class="card-head"><ElementMark :mark="c.group" :size="30" /> {{ c.name }}</span>
-                        <span class="card-reading">{{ c.reading }}</span>
-                        <span class="card-phrase">{{ c.phrase }}</span>
+                        <span class="card-reading" :class="{ 'is-morse': c.morse }">{{ c.reading }}</span>
+                        <span v-if="c.phrase" class="card-phrase">{{ c.phrase }}</span>
                         <span class="card-rating">
                             <template v-if="c.rating"><b v-if="c.rating.mark">{{ c.rating.mark }}</b><span>{{ c.rating.text }}</span></template>
                             <span v-else class="card-support">{{ c.support }}</span>
@@ -222,6 +224,13 @@ h2 {
     font-family: var(--hand);
     font-size: 2rem;
     line-height: 1.2;
+}
+
+.card-reading.is-morse {
+    font-family: var(--ui);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
 }
 
 .card-phrase {

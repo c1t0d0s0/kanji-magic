@@ -12,7 +12,10 @@ export interface Question {
 
 // One of the 3 kanji to choose from before the magic circle (components/SpellChoice.vue)
 export interface Choice {
-    question: Question;
+    // The kanji to write (the kanji way), or
+    question?: Question;
+    // the word to send in Morse code (src/morse/: FIRE1A)
+    word?: string;
     group: SpellGroup;
     // How well it would work on the enemies there now (game/battle.ts spellRating)
     rating: 'good' | 'normal' | 'weak' | 'none';

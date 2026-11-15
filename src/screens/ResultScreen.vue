@@ -22,6 +22,8 @@ const hero = computed(() => {
     const id = save.deck[0];
     return id ? { id, form: formOf(save.units[id]) } : null;
 });
+// Words sent in Morse code (src/morse/): no model to see
+const morse = computed(() => report.value?.spells.some(s => s.morse) ?? false);
 const perfects = computed(() => report.value?.spells.filter(s => s.grade === 'perfect' && !s.traced).length ?? 0);
 
 function again() {
@@ -52,17 +54,21 @@ function toNext() {
         </section>
 
         <section class="card">
-            <h2><Furi text="[今回|こんかい] [書|か]いた [漢字|かんじ]" /></h2>
+            <h2><Furi :text="morse ? '[今回|こんかい] [送|おく]った モールス[信号|しんごう]' : '[今回|こんかい] [書|か]いた [漢字|かんじ]'" /></h2>
             <p v-if="report.spells.length === 0" class="muted"><Furi text="[魔法|まほう]を [使|つか]わなかったよ" /></p>
             <ul v-else class="written">
                 <li v-for="(s, i) in report.spells" :key="i">
-                    <button type="button" class="written-kanji" :class="s.grade" :aria-label="`${s.kanji} ${SPELL_GRADE_LABEL[s.grade]}。お手本を 見る`" @click="looking = s.kanji">
+                    <span v-if="s.morse" class="written-kanji is-morse" :class="s.grade">
+                        <span class="k">{{ s.morse }}</span>
+                        <span class="g">{{ SPELL_GRADE_LABEL[s.grade] }}</span>
+                    </span>
+                    <button v-else type="button" class="written-kanji" :class="s.grade" :aria-label="`${s.kanji} ${SPELL_GRADE_LABEL[s.grade]}。お手本を 見る`" @click="looking = s.kanji">
                         <span class="k">{{ s.kanji }}</span>
                         <span class="g">{{ s.traced ? 'なぞり' : SPELL_GRADE_LABEL[s.grade] }}</span>
                     </button>
                 </li>
             </ul>
-            <p class="muted"><Furi text="[漢字|かんじ]を [押|お]すと お[手本|てほん]が [見|み]られるよ" /></p>
+            <p v-if="!morse" class="muted"><Furi text="[漢字|かんじ]を [押|お]すと お[手本|てほん]が [見|み]られるよ" /></p>
         </section>
 
         <nav class="actions">
@@ -130,6 +136,17 @@ h2 {
     font-family: var(--font-kyokasho);
     font-size: 2rem;
     line-height: 1.2;
+}
+
+.is-morse {
+    cursor: default;
+}
+
+.is-morse .k {
+    font-family: var(--ui);
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
 }
 
 .written-kanji .g {

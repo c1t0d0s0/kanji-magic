@@ -58,9 +58,13 @@ export type SpellEffect =
 
 // What the spell does; null for ふはつ (nothing happens)
 export function spellEffect(kanji: string, grade: SpellGrade, strokes: number): SpellEffect | null {
+    return effectOfGroup(spellGroup(kanji), grade, strokes);
+}
+
+// The same by the group: a word sent in Morse code (src/morse/) has its letters for the strokes
+export function effectOfGroup(group: SpellGroup, grade: SpellGrade, strokes: number): SpellEffect | null {
     const power = spellPower(grade, strokes);
     if (power <= 0) return null;
-    const group = spellGroup(kanji);
     switch (group) {
         case 'fire':
         case 'water':

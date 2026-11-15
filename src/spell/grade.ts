@@ -74,7 +74,10 @@ export function gradeSpell(writing: readonly Stroke[], kanji: string, kit: Tegak
 
 // What came of a magic circle (SpellOverlay), for the battle and for the record of the learning
 export interface SpellOutcome {
+    // '' for a word sent in Morse code
     kanji: string;
+    // The word sent in Morse code (src/morse/), when it was one
+    morse?: string;
     grade: SpellGrade;
     // なぞりモード: traced over the model. せいこう at best, and kept as れんしゅう (not for 8.1)
     traced: boolean;

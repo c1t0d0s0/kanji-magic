@@ -54,7 +54,7 @@ describe('furigana', () => {
     });
 
     it('no kanji at all in the magic circle and the practice page (they would give the answer away)', () => {
-        for (const f of ['src/components/SpellOverlay.vue', 'src/components/SpellChoice.vue', 'src/components/SpellPrompt.vue', 'src/practice/PracticeApp.vue']) {
+        for (const f of ['src/components/SpellOverlay.vue', 'src/components/MorseOverlay.vue', 'src/components/SpellChoice.vue', 'src/components/SpellPrompt.vue', 'src/practice/PracticeApp.vue']) {
             expect(kana(template(f)).match(/\p{Script=Han}/gu), f).toBeNull();
         }
     });

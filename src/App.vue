@@ -22,7 +22,7 @@ onMounted(() => document.addEventListener('pointerdown', unlockAudio, { once: tr
 // On a PC: as big as the window allows, without scrolling
 useFitScreen(() => ui.screen, () => ui.screen === 'battle');
 // The tab's title: no ruby there, so the kanji not learned yet are in kana
-watchEffect(() => (document.title = textFor('[漢字|かんじ][魔法|まほう][大|だい][戦争|せんそう]', save.settings.grade)));
+watchEffect(() => (document.title = textFor('KM[魔法|まほう][大|だい][戦争|せんそう]', save.settings.grade)));
 </script>
 
 <template>
