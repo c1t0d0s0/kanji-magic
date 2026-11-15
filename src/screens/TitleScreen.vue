@@ -14,7 +14,6 @@ function open(screen: 'stages' | 'book' | 'settings' | 'credits') {
 
 <template>
     <main class="title">
-        <p class="title-sub"><Furi text="[書|か]いて [撃|う]つ！" /></p>
         <h1><Furi text="KM[魔法|まほう]" /><br><Furi text="[大|だい][戦争|せんそう]" /></h1>
         <TitleParade />
         <nav class="title-menu">
@@ -35,12 +34,6 @@ function open(screen: 'stages' | 'book' | 'settings' | 'credits') {
     min-height: 100dvh;
     padding: 1rem;
     text-align: center;
-}
-
-.title-sub {
-    font-family: var(--hand);
-    font-weight: 600;
-    color: var(--muted);
 }
 
 h1 {
