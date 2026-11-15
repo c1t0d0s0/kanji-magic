@@ -3,7 +3,8 @@
 // The battle state (game/battle.ts) is not reactive; a few numbers for the buttons are copied into
 // `hud` at each frame. The judging is loaded when the battle starts (requirements 6.1): until it is
 // ready the まほう button says じゅんびちゅう. While the magic circle is open the battle goes at
-// SPELL_SLOW; the spell goes off when it is judged, and the battle is back to speed when it closes.
+// SPELL_SLOW; when it closes the battle is back to speed and the spell goes off then, where the
+// child can see it hit (judged behind the dark veil, it was not seen).
 // Stage 1 is the tutorial: a pointing hand shows the unit button, then the まほう button.
 // With Morse code (せってい: for a PC with no touch screen) a word is sent instead of a kanji
 // written (MorseOverlay); nothing to load then, and the kanji's records are not touched.
@@ -24,10 +25,10 @@ import { stageById } from '../game/stages';
 import { formOf, unitStats, type UnitId } from '../game/units';
 import { plain } from '../learning/furi';
 import { pickChoices } from '../learning/picker';
-import { effectOfGroup, elementOfGroup, spellEffect, spellGroup, type SpellGroup } from '../spell/effects';
+import { effectOfGroup, elementOfGroup, spellEffect, spellGroup, type SpellEffect, type SpellGroup } from '../spell/effects';
 import { ELEMENTS } from '../spell/elements';
 import { morseWord } from '../morse/spell';
-import type { SpellOutcome } from '../spell/grade';
+import type { SpellGrade, SpellOutcome } from '../spell/grade';
 import { questionFor, type Choice, type Question } from '../spell/question';
 import { loadTegaki, type TegakiKit } from '../spell/tegaki';
 import { play, unlockAudio, type SoundName } from '../sound';
@@ -231,27 +232,35 @@ function chosen(i: number) {
     question.value = c.question;
 }
 
-// The spell is judged: it goes off now (the battle still slow behind the circle)
+// The spell is judged: the result is shown over the circle; it goes off when the circle closes
+let pending: { effect: SpellEffect | null; grade: SpellGrade; group: SpellGroup } | null = null;
+
 function judged(outcome: SpellOutcome) {
     spells.push(outcome);
+    play(outcome.grade);
     if (outcome.morse) {
         // The letters of the word for the strokes; not a kanji: no records of it
-        castSpell(battle, effectOfGroup(wordGroup, outcome.grade, outcome.morse.length), outcome.grade);
-        play(outcome.grade);
-        if (outcome.grade !== 'fail') setTimeout(() => play(wordGroup), 250);
+        pending = { effect: effectOfGroup(wordGroup, outcome.grade, outcome.morse.length), grade: outcome.grade, group: wordGroup };
         return;
     }
     const strokes = strokesOf(outcome.kanji);
-    castSpell(battle, spellEffect(outcome.kanji, outcome.grade, strokes), outcome.grade);
-    play(outcome.grade);
-    if (outcome.grade !== 'fail') setTimeout(() => play(spellGroup(outcome.kanji)), 250);
+    pending = { effect: spellEffect(outcome.kanji, outcome.grade, strokes), grade: outcome.grade, group: spellGroup(outcome.kanji) };
     recordOutcome(outcome);
+}
+
+function goOff() {
+    const p = pending;
+    pending = null;
+    if (!p) return;
+    castSpell(battle, p.effect, p.grade);
+    if (p.grade !== 'fail') play(p.group);
 }
 
 function closed() {
     question.value = null;
     word.value = null;
     loop.timeScale = 1;
+    goOff();
     if (stage.tutorial && !save.tutorialDone && tutorial.value === null) {
         tutorial.value = 'cheer';
         setTimeout(() => {

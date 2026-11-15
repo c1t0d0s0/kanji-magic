@@ -4,7 +4,7 @@
 // keys. The word is sent a letter at a time: a letter right goes on to the next, a wrong one is a
 // miss and is sent again. 初級 shows the code under each letter. The spell goes off when all is
 // sent or the time runs out (morse/spell.ts: the result), then the result, and it closes.
-// Emits judged when the spell goes off and done when it closes, as SpellOverlay.
+// Emits judged when it is judged and done when it closes (the battle casts it then), as SpellOverlay.
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import MuteButton from './MuteButton.vue';
 import { useNoSelect } from './noSelect';

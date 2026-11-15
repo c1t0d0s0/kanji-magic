@@ -7,7 +7,7 @@
 // (with what is written by then). Then the result, and the model unless it was かんぺき (a tap
 // skips it). なぞりモード (6.5): each stroke is traced over the model, and kept only when traceStroke
 // says it follows it; all traced is せいこう (れんしゅう).
-// Emits judged when the spell goes off (the battle can start the effect) and done when it closes.
+// Emits judged when the spell is judged and done when it closes (the battle casts it then, in view).
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import WritingPad from '../vendor/kanji-quiz/src/components/WritingPad.vue';
 import ModelStrokes from '../vendor/kanji-quiz/src/components/ModelStrokes.vue';

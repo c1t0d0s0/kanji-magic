@@ -54,8 +54,8 @@ export interface Fighter {
 
 // fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
 // spark: a hit on the element it beats; good / weak: a spell that worked well / not well on most;
-// change: the boss changed its element
-export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect';
+// change: the boss changed its element; damage: the harm a spell did to one enemy (a number over it)
+export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect' | 'damage';
 
 // Who made it (for the picture only)
 export interface FxWho {
@@ -74,6 +74,11 @@ export interface Fx {
     total: number;
     to?: number;
     who?: FxWho;
+    // damage: how much, and how well the element worked on that one
+    amount?: number;
+    tone?: 'good' | 'normal' | 'weak';
+    // damage: how many numbers are under this one (enemies close together: stacked, not over each other)
+    stack?: number;
 }
 
 const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element });
@@ -224,6 +229,8 @@ function harm(f: Fighter, amount: number) {
 const enemies = (b: Battle) => b.fighters.filter(f => f.side === 'enemy' && f.hp > 0);
 const allies = (b: Battle) => b.fighters.filter(f => f.side === 'ally' && f.hp > 0);
 const resist = (f: Fighter) => (f.boss ? BOSS_SPELL_RESIST : 1);
+// A spell's hit: the one hit flinches this long (a unit's hit: 200 ms)
+const SPELL_HURT_MS = 600;
 
 // The spell goes off (effect null: ふはつ). Part of the gauge comes back (かんぺき, ふはつ)
 export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGrade) {
@@ -236,13 +243,20 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
     switch (effect.kind) {
         case 'attack': {
             let good = 0, weak = 0;
+            const hitAt: number[] = [];
             for (const f of enemies(b)) {
                 const k = affinity(effect.element, f.element, 'spell');
                 if (k > 1) good++;
                 if (k < 1) weak++;
-                harm(f, effect.damage * k * resist(f));
+                const dealt = effect.damage * k * resist(f);
+                harm(f, dealt);
                 if (effect.push) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
                 if (effect.stopMs) f.stopMs = Math.max(f.stopMs, effect.stopMs * resist(f));
+                // Seen on each one (where the wave left it): a longer flinch, and the number over it
+                f.hurtMs = Math.max(f.hurtMs, SPELL_HURT_MS);
+                const stack = hitAt.filter(x => Math.abs(x - f.x) < 60).length;
+                hitAt.push(f.x);
+                b.fx.push({ kind: 'damage', x: f.x, ms: 0, total: 1300, who: whoOf(f), amount: Math.round(dealt), tone: k > 1 ? 'good' : k < 1 ? 'weak' : 'normal', stack });
             }
             if (good > weak) b.fx.push({ kind: 'good', x: middle, ms: 0, total: 1400 });
             else if (weak > good) b.fx.push({ kind: 'weak', x: middle, ms: 0, total: 1400 });

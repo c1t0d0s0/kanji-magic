@@ -54,7 +54,7 @@ export function poseOf(f: Fighter, time: number): Pose {
         walk: !f.fighting && !stopped ? 1 : 0,
         windup: f.fighting && !stopped && f.wait < 250 ? 1 - f.wait / 250 : 0,
         attack: f.fighting && !stopped && since < 300 && since >= 0 ? 1 - since / 300 : 0,
-        hurt: f.hurtMs / 200,
+        hurt: Math.min(1, f.hurtMs / 200),
         stopped,
         form: f.form,
         color: f.color,
@@ -286,6 +286,16 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             ctx.strokeText('かんぺき！', width / 2, 80 - t * 20);
             ctx.fillText('かんぺき！', width / 2, 80 - t * 20);
             break;
+        case 'damage': {
+            // The harm of a spell over the one hit: bigger and red when the element worked well
+            if (!fx.who || fx.amount === undefined) break;
+            const big = fx.tone === 'good', small = fx.tone === 'weak';
+            const pop = 1 + 0.35 * Math.max(0, 1 - t * 6);
+            const px = (big ? 40 : small ? 24 : 32) * pop;
+            const y = GROUND - fx.who.size * DRAW_SCALE * 1.15 - 34 - ease(t) * 40 - (fx.stack ?? 0) * 46;
+            shout(ctx, `-${fx.amount}${big ? '!' : ''}`, fx.x, y, px, big ? '#d9480f' : small ? '#6c757d' : '#c92a2a', Math.min(1, fade * 2.5));
+            break;
+        }
         case 'fizzle':
             ctx.font = `bold 40px ${UI}`;
             ctx.fillStyle = `rgb(110 110 120 / ${fade})`;
