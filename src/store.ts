@@ -29,6 +29,8 @@ export interface BattleReport {
     reward: number;
     firstClear: boolean;
     spells: SpellOutcome[];
+    // The spells were sent in Morse code (the せってい of the battle), even when none was cast
+    morse: boolean;
 }
 
 export const ui = reactive({
@@ -99,7 +101,7 @@ export function recordOutcome(outcome: SpellOutcome) {
     persist();
 }
 
-export function finishBattle(stage: Stage, won: boolean, stars: number, spells: SpellOutcome[]): BattleReport {
+export function finishBattle(stage: Stage, won: boolean, stars: number, spells: SpellOutcome[], morse = false): BattleReport {
     const before = save.stages[stage.id];
     const firstClear = won && !before?.cleared;
     const perfects = spells.filter(s => s.grade === 'perfect' && !s.traced).length;
@@ -109,7 +111,7 @@ export function finishBattle(stage: Stage, won: boolean, stars: number, spells: 
     if (stage.tutorial && won) save.tutorialDone = true;
     fillDeck();
     persist();
-    const report = { stage, won, stars, reward, firstClear, spells };
+    const report = { stage, won, stars, reward, firstClear, spells, morse };
     lastReport.value = report;
     return report;
 }

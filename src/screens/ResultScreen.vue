@@ -22,8 +22,11 @@ const hero = computed(() => {
     const id = save.deck[0];
     return id ? { id, form: formOf(save.units[id]) } : null;
 });
-// Words sent in Morse code (src/morse/): no model to see
-const morse = computed(() => report.value?.spells.some(s => s.morse) ?? false);
+// Words sent in Morse code (src/morse/): no model to see. By the way of the battle, not by the
+// spells (none may have been cast)
+const morse = computed(() => report.value ? report.value.morse || report.value.spells.some(s => s.morse) : false);
+// The hint to tap a kanji, only when there is one to tap
+const kanjiWritten = computed(() => report.value?.spells.some(s => !s.morse && s.kanji) ?? false);
 const perfects = computed(() => report.value?.spells.filter(s => s.grade === 'perfect' && !s.traced).length ?? 0);
 
 function again() {
@@ -68,7 +71,7 @@ function toNext() {
                     </button>
                 </li>
             </ul>
-            <p v-if="!morse" class="muted"><Furi text="[漢字|かんじ]を [押|お]すと お[手本|てほん]が [見|み]られるよ" /></p>
+            <p v-if="kanjiWritten" class="muted"><Furi text="[漢字|かんじ]を [押|お]すと お[手本|てほん]が [見|み]られるよ" /></p>
         </section>
 
         <nav class="actions">

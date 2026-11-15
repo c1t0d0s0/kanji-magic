@@ -276,7 +276,7 @@ function end() {
     setTimeout(() => {
         loop.stop();
         const perfects = spells.filter(s => s.grade === 'perfect' && !s.traced).length;
-        finishBattle(stage, battle.result === 'win', starsOf(battle, perfects), spells);
+        finishBattle(stage, battle.result === 'win', starsOf(battle, perfects), spells, morse);
         go('result');
     }, 1500);
 }
