@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MORSE_DASH_AT, MORSE_LETTER_GAP, MORSE_SECONDS } from '../src/config';
-import { charOf, codeOf, dotsAndDashes, MORSE } from '../src/morse/code';
+import { charOf, codeOf, dotsAndDashes, isFinal, MORSE } from '../src/morse/code';
 import { Keyer } from '../src/morse/keyer';
 import { morseGrade, morseSeconds, morseWord, WORDS } from '../src/morse/spell';
 import { ELEMENTS } from '../src/spell/elements';
@@ -19,6 +19,13 @@ describe('Morse code', () => {
         expect(codeOf('f')).toBe('..-.');
         expect(charOf('......')).toBe('');
         expect(dotsAndDashes('..-.')).toBe('・・－・');
+    });
+
+    it('knows the codes no letter goes on from', () => {
+        for (const c of 'CFLPQXY0123456789') expect(isFinal(codeOf(c)), c).toBe(true);
+        // T (M), E (I), O (8), B (6), J (1): more can follow
+        for (const c of 'TEOBJ') expect(isFinal(codeOf(c)), c).toBe(false);
+        expect(isFinal('')).toBe(false);
     });
 });
 
@@ -113,6 +120,24 @@ describe('the Morse key', () => {
         vi.advanceTimersByTime(DOT * MORSE_LETTER_GAP.dot);
         expect(letters).toEqual(['-', '.']);
         expect(symbols).toEqual(['-', '.']);
+    });
+
+    it('a code no letter goes on from is taken at once; T waits, as M may follow', () => {
+        // F: ..-.
+        for (const s of '..-') {
+            hold(s === '.' ? DOT : DOT * 3);
+            vi.advanceTimersByTime(DOT);
+        }
+        expect(letters).toEqual([]);
+        hold(DOT);
+        expect(letters).toEqual(['..-.']);
+        // T for M: the second dash within the gap makes it M
+        hold(DOT * 3);
+        vi.advanceTimersByTime(DOT);
+        expect(letters).toEqual(['..-.']);
+        hold(DOT * 3);
+        vi.advanceTimersByTime(DOT * MORSE_LETTER_GAP.dot);
+        expect(letters).toEqual(['..-.', '--']);
     });
 
     it('commit takes the letter at once; back takes back a symbol; reset forgets it', () => {

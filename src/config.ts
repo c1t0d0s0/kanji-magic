@@ -52,9 +52,12 @@ export const MORSE_WPM = 12;
 // 電鍵: a key held longer than this many dots is a dash (morse-master TappingQuiz)
 export const MORSE_DASH_AT = 1.8;
 // A letter is taken after no keying for this many dots, counted from the release of the 電鍵 or
-// from the start of the paddle's last symbol (so after a dash, 2 more: its length). morse-master
-// FreeKeyer has 3.5 and 5.5; a little more here, for children (Enter takes it at once)
-export const MORSE_LETTER_GAP = { dot: 5, dash: 7 };
+// from the start of the paddle's last symbol (so after a dash, 2 more: its length), as morse-master
+// FreeKeyer. Enter takes it at once, and so does a code no letter goes on from (MORSE_TAKE_FINAL)
+export const MORSE_LETTER_GAP = { dot: 3.5, dash: 5.5 };
+// A code that no longer code begins with (C, F, L, P, Q, X, Y and the numbers): taken at once, as
+// nothing more can be keyed for it. Any other (T: M may follow) waits for the gap
+export const MORSE_TAKE_FINAL = true;
 // The time to send a word: base + each letter (FIRE1A: 30 s). Numbers are 5 symbols long
 export const MORSE_SECONDS = { base: 6, perChar: 4 };
 // The wrong letters (they are sent again) still allowed for かんぺき and せいこう

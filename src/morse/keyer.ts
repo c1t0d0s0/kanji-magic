@@ -1,11 +1,13 @@
 // --- The Morse key: dots and dashes, and a letter when the keying stops ---
 // パドル: two keys, a dot and a dash; held, it sends them again and again (PaddleRepeater).
 // 電鍵: one key; held longer than MORSE_DASH_AT dots it is a dash. A letter is taken after no
-// keying for MORSE_LETTER_GAP dots, or at once by commit() (Enter). From morse-master
+// keying for MORSE_LETTER_GAP dots, at once by commit() (Enter), or at once when no letter goes on
+// from its code (isFinal: C, F, the numbers). Not by the letter asked: T keyed for M is wrong. From morse-master
 // (TappingQuiz, FreeKeyer, usePaddleKeyer), without React: Keyer is plain (tests/morse.test.ts),
 // useKeyer puts it on a Vue component with the keyboard.
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { MORSE_DASH_AT, MORSE_LETTER_GAP, MORSE_WPM } from '../config';
+import { MORSE_DASH_AT, MORSE_LETTER_GAP, MORSE_TAKE_FINAL, MORSE_WPM } from '../config';
+import { isFinal } from './code';
 import type { Keyer as KeyerKind } from '../storage';
 import { PaddleRepeater, type PaddleSymbol } from './paddleRepeater';
 
@@ -107,6 +109,10 @@ export class Keyer {
         this.on.symbol?.(s);
         this.setCode(this.code + s);
         this.clearTimer();
+        if (MORSE_TAKE_FINAL && isFinal(this.code)) {
+            this.commit();
+            return;
+        }
         this.timer = setTimeout(() => this.commit(), this.dotMs * gapDots);
     }
 

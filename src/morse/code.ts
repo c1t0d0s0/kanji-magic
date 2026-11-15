@@ -18,5 +18,9 @@ export const codeOf = (char: string): string => MORSE[char.toUpperCase()] ?? '';
 // The letter a code is ('' if none)
 export const charOf = (code: string): string => BY_CODE.get(code) ?? '';
 
+// No longer code begins with this one: nothing more can be keyed for it (C, F, the numbers)
+export const isFinal = (code: string): boolean =>
+    code !== '' && !Object.values(MORSE).some(c => c.length > code.length && c.startsWith(code));
+
 // To show: ..-. → ・・－・
 export const dotsAndDashes = (code: string): string => code.replace(/\./g, '・').replace(/-/g, '－');
