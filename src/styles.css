@@ -41,8 +41,14 @@
     box-sizing: border-box;
 }
 
+/* On a big screen (a PC), everything is bigger: the sizes are in rem, and the root font size grows
+   with the screen, by its width and its height (the smaller of the two, so a wide but low window
+   still has room for the battle). Never smaller than the browser's own size (a phone, a tablet),
+   never more than twice as big. A screen with much on it is made smaller again so that it needs no
+   scrolling (fitScreen.ts). */
 html {
     -webkit-text-size-adjust: 100%;
+    font-size: clamp(100%, min(1.25vw, 2.1vh), 200%);
 }
 
 body {
@@ -333,6 +339,15 @@ button {
     flex: 1 0 auto;
     width: 100%;
     min-height: 0;
+}
+
+/* While the page is measured (fitScreen.ts): only as tall as what is on it */
+.fit-measure #app {
+    min-height: 0;
+}
+
+.fit-measure #app > main {
+    flex: none;
 }
 
 .site-footer {

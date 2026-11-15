@@ -15,7 +15,11 @@ import { AUTO_CONFIRM_MS, SPELL_MULTIPLIER } from '../config';
 import { gradeSpell, SPELL_GRADE_LABEL, type SpellResult } from '../spell/grade';
 import { pickQuestion } from '../spell/question';
 import SiteFooter from '../components/SiteFooter.vue';
+import { useFitScreen } from '../fitScreen';
 import { loadTegaki, outcomeMessage, tegakiDebug, verdictMarks, type TegakiKit } from '../spell/tegaki';
+
+// On a PC: as big as the window allows, without scrolling
+useFitScreen();
 
 const GRADES = [1, 2, 3, 4, 5, 6];
 

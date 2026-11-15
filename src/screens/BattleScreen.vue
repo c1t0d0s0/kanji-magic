@@ -70,12 +70,34 @@ const tutorialText = computed(() => {
 // --- Drawing ---
 const canvas = ref<HTMLCanvasElement | null>(null);
 const field = ref<HTMLElement | null>(null);
+const hudBox = ref<HTMLElement | null>(null);
 let scale = 1;
 let observer: ResizeObserver | null = null;
+// A PC (as in the style below): the battle has to fit in the window
+const pc = typeof matchMedia === 'function' ? matchMedia('(min-width: 64em) and (min-height: 36em)') : null;
+
+// On a PC, the field not wider than the window's height allows: what is under it (the money, the
+// units, a tutorial) must be seen with no scrolling. What is under it does not depend on the
+// field, so this gives the same width again when the field has changed: it does not go round.
+function fieldLimit(f: HTMLElement): string {
+    const main = f.parentElement, hudEl = hudBox.value;
+    if (!pc?.matches || !main || !hudEl) return '';
+    const style = getComputedStyle(main);
+    const rest = hudEl.getBoundingClientRect().bottom - main.getBoundingClientRect().top + (parseFloat(style.paddingBottom) || 0) - f.offsetHeight;
+    const room = (window.innerHeight - rest) * (LANE.width / FIELD_HEIGHT);
+    const full = main.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+    // Never too small: then it scrolls
+    return room < full ? `${Math.max(Math.floor(room), Math.round(full * 0.5))}px` : '';
+}
 
 function fit() {
     const c = canvas.value, f = field.value;
     if (!c || !f) return;
+    const limit = fieldLimit(f);
+    // A pixel more or less (the rounding of the heights) is not a change: else it goes to and fro
+    const was = parseFloat(f.style.maxWidth), now = parseFloat(limit);
+    const same = limit === f.style.maxWidth || (!isNaN(was) && !isNaN(now) && Math.abs(was - now) <= 2);
+    if (!same) f.style.maxWidth = limit;
     const ratio = window.devicePixelRatio || 1;
     const width = f.clientWidth;
     const height = (width * FIELD_HEIGHT) / LANE.width;
@@ -237,6 +259,9 @@ function onVisibility() {
 onMounted(() => {
     observer = new ResizeObserver(fit);
     if (field.value) observer.observe(field.value);
+    // A tutorial or a note under the field: less room for it
+    if (hudBox.value) observer.observe(hudBox.value);
+    window.addEventListener('resize', fit);
     fit();
     loop.start();
     void load();
@@ -246,6 +271,7 @@ onBeforeUnmount(() => {
     leaving = true;
     loop.stop();
     observer?.disconnect();
+    window.removeEventListener('resize', fit);
     clearTimeout(retry);
     document.removeEventListener('visibilitychange', onVisibility);
 });
@@ -265,7 +291,7 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
             <p v-if="hud.result" class="battle-banner" :class="hud.result"><Furi :text="hud.result === 'win' ? '[勝|か]ち！' : '[負|ま]けちゃった…'" /></p>
         </div>
 
-        <div class="battle-hud">
+        <div ref="hudBox" class="battle-hud">
             <div class="hud-row">
                 <p class="money" aria-live="off">💰 {{ hud.money }} / {{ hud.cap }}</p>
                 <button type="button" class="btn" :disabled="!hud.canWallet" @click="wallet">
@@ -327,6 +353,14 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
     padding: 0.5rem 1rem 1rem;
 }
 
+/* On a PC (wide, and tall enough): the whole battle in the window, no scrolling. The field is
+   2.5 times as wide as high (LANE.width / FIELD_HEIGHT); about 19rem go to the rest */
+@media (min-width: 64em) and (min-height: 36em) {
+    .battle {
+        max-width: min(72rem, (100dvh - 19rem) * 2.5 + 2rem);
+    }
+}
+
 .battle-head {
     display: flex;
     align-items: center;
@@ -342,6 +376,8 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
 .battle-field {
     position: relative;
     width: 100%;
+    /* Narrower on a PC with a low window (fieldLimit) */
+    margin-inline: auto;
     border-radius: 0.75rem;
     overflow: hidden;
     box-shadow: 0 0 0 2px var(--rule);

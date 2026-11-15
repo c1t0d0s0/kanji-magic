@@ -20,7 +20,8 @@ function draw(t: number) {
     const c = canvas.value;
     const ctx = c?.getContext('2d');
     if (!c || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    // Drawn sharp at its size on the screen (rem: bigger on a big screen)
+    const dpr = (window.devicePixelRatio || 1) * ((c.clientWidth || W) / W);
     if (c.width !== Math.round(W * dpr)) {
         c.width = Math.round(W * dpr);
         c.height = Math.round(H * dpr);
@@ -73,6 +74,6 @@ onBeforeUnmount(() => cancelAnimationFrame(frame));
 <style scoped>
 .parade {
     display: block;
-    width: min(100%, 360px);
+    width: min(100%, 22.5rem);
 }
 </style>

@@ -15,9 +15,12 @@ import CreditsScreen from './screens/CreditsScreen.vue';
 import { unlockAudio } from './sound';
 import { textFor } from './learning/furi';
 import { save, ui } from './store';
+import { useFitScreen } from './fitScreen';
 
 // Browsers allow sound only after a tap
 onMounted(() => document.addEventListener('pointerdown', unlockAudio, { once: true }));
+// On a PC: as big as the window allows, without scrolling
+useFitScreen(() => ui.screen, () => ui.screen === 'battle');
 // The tab's title: no ruby there, so the kanji not learned yet are in kana
 watchEffect(() => (document.title = textFor('[漢字|かんじ][魔法|まほう][大|だい][戦争|せんそう]', save.settings.grade)));
 </script>

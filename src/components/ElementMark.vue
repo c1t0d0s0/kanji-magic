@@ -8,12 +8,14 @@ import { MARK_PATHS } from '../art/marks';
 
 const props = withDefaults(defineProps<{ mark: SpellGroup | Element | 'cycle'; size?: number }>(), { size: 24 });
 
+// px at the root font size of 16px (rem: bigger on a big screen, styles.css)
+const px = computed(() => (props.mark === 'cycle' ? props.size * 0.7 : props.size));
 const marks = computed(() => (props.mark === 'cycle' ? (['fire', 'water', 'wood'] as const) : [props.mark]).map(m => MARK_PATHS[m]));
 </script>
 
 <template>
     <span class="element-mark" aria-hidden="true">
-        <svg v-for="(m, i) in marks" :key="i" viewBox="0 0 24 24" :width="mark === 'cycle' ? size * 0.7 : size" :height="mark === 'cycle' ? size * 0.7 : size">
+        <svg v-for="(m, i) in marks" :key="i" viewBox="0 0 24 24" :style="{ width: `${px / 16}rem`, height: `${px / 16}rem` }">
             <path :d="m.d" :fill="m.color" stroke="#2b2340" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
         </svg>
     </span>

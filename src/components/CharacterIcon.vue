@@ -12,7 +12,7 @@ import { UNITS, type UnitId } from '../game/units';
 const props = withDefaults(defineProps<{
     kind: UnitId | EnemyId;
     form?: 0 | 1 | 2;
-    // px (css)
+    // px (css) at the root font size of 16px: it grows with the screen as the rest (styles.css)
     size?: number;
     animate?: boolean;
     mood?: Mood;
@@ -23,6 +23,7 @@ const props = withDefaults(defineProps<{
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let frame = 0;
+let observer: ResizeObserver | null = null;
 
 const colorOf = () => (props.kind in UNITS ? UNITS[props.kind as UnitId].forms[props.form].color : props.element ? ELEMENT_BODY[props.element] : ENEMIES[props.kind as EnemyId].color);
 
@@ -30,13 +31,14 @@ function draw(t: number) {
     const c = canvas.value;
     const ctx = c?.getContext('2d');
     if (!c || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const px = Math.round(props.size * dpr);
+    // The size on the screen (rem: bigger on a big screen), drawn sharp at it
+    const k = (window.devicePixelRatio || 1) * ((c.clientWidth || props.size) / props.size);
+    const px = Math.round(props.size * k);
     if (c.width !== px) c.width = c.height = px;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, px, px);
     // The body takes about 3/5 of the box, the feet near the bottom
-    ctx.setTransform(dpr, 0, 0, dpr, props.size * 0.5 * dpr, props.size * 0.9 * dpr);
+    ctx.setTransform(k, 0, 0, k, props.size * 0.5 * k, props.size * 0.9 * k);
     const pose = { ...restPose(props.form, colorOf(), t, props.mood), walk: props.walk ? 1 : 0 };
     ART[props.kind](ctx, props.size * 0.58, pose);
 }
@@ -54,13 +56,23 @@ function start() {
     else draw(800);
 }
 
-onMounted(start);
+onMounted(() => {
+    start();
+    // The screen grew or shrank: drawn again at the new size
+    if (typeof ResizeObserver === 'function' && canvas.value) {
+        observer = new ResizeObserver(() => { if (!props.animate || still()) draw(800); });
+        observer.observe(canvas.value);
+    }
+});
 watch(() => [props.kind, props.form, props.size, props.animate, props.mood, props.walk, props.element], start);
-onBeforeUnmount(() => cancelAnimationFrame(frame));
+onBeforeUnmount(() => {
+    cancelAnimationFrame(frame);
+    observer?.disconnect();
+});
 </script>
 
 <template>
-    <canvas ref="canvas" class="character-icon" :style="{ width: `${size}px`, height: `${size}px` }" aria-hidden="true"></canvas>
+    <canvas ref="canvas" class="character-icon" :style="{ width: `${size / 16}rem`, height: `${size / 16}rem` }" aria-hidden="true"></canvas>
 </template>
 
 <style scoped>

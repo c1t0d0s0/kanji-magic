@@ -43,7 +43,7 @@ function start() {
 </script>
 
 <template>
-    <main class="screen">
+    <main class="screen formation">
         <header class="screen-head">
             <button type="button" class="btn" @click="go('stages')"><Furi text="[戻|もど]る" /></button>
             <h1><Furi text="[編成|へんせい]" /></h1>
@@ -70,7 +70,7 @@ function start() {
             <button type="button" class="btn btn-primary btn-go" @click="start"><Furi text="[出撃|しゅつげき]！" /></button>
         </section>
 
-        <p>どんぐり：<b>{{ save.materials }}</b>（<Furi text="[勝|か]つと もらえるよ" />）</p>
+        <p class="acorns">どんぐり：<b>{{ save.materials }}</b>（<Furi text="[勝|か]つと もらえるよ" />）</p>
 
         <ul class="units">
             <li v-for="u in units" :key="u.id" class="card unit" :class="{ locked: !u.open }">
@@ -100,6 +100,47 @@ function start() {
 </template>
 
 <style scoped>
+/* On a wide screen (a PC): the stage on the left, the units on the right, so that it all fits in
+   the window without scrolling (fitScreen.ts) */
+@media (min-width: 64em) {
+    .formation {
+        display: grid;
+        grid-template-columns: minmax(18rem, 1fr) 2fr;
+        grid-template-rows: auto auto auto auto 1fr;
+        grid-template-areas:
+            "head head"
+            "go units"
+            "acorns units"
+            "hint units"
+            ". units";
+        align-content: start;
+        max-width: 80rem;
+    }
+
+    .formation > .screen-head {
+        grid-area: head;
+    }
+
+    .go {
+        grid-area: go;
+    }
+
+    .acorns {
+        grid-area: acorns;
+    }
+
+    /* The units two by two */
+    .units {
+        grid-area: units;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-content: start;
+    }
+
+    .hint {
+        grid-area: hint;
+    }
+}
+
 .go {
     display: grid;
     gap: 0.5rem;
