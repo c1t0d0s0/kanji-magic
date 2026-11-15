@@ -14,7 +14,7 @@ import SpellChoice from '../components/SpellChoice.vue';
 import MorseOverlay from '../components/MorseOverlay.vue';
 import MuteButton from '../components/MuteButton.vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
-import { LANE, MANA_MAX, SPELL_SLOW } from '../config';
+import { LANE, MANA_MAX, SPELL_SLOW, WALLET } from '../config';
 import {
     canSummon, canUpgradeWallet, castSpell, spellRating, createBattle, manaFull, starsOf, startSpell, step, summon, upgradeWallet, walletOf, type BattleEvent
 } from '../game/battle';
@@ -60,6 +60,10 @@ const hud = reactive({
     cap: 0,
     walletLevel: 1,
     walletNext: null as number | null,
+    // How fast the money grows (per second), and what the next level of the wallet gives
+    rate: 0,
+    nextRate: null as number | null,
+    nextCap: null as number | null,
     canWallet: false,
     mana: 0,
     manaFull: false,
@@ -135,6 +139,10 @@ function draw() {
     hud.cap = w.cap;
     hud.walletLevel = battle.wallet + 1;
     hud.walletNext = w.next;
+    hud.rate = w.rate;
+    const n = WALLET[battle.wallet + 1];
+    hud.nextRate = n?.rate ?? null;
+    hud.nextCap = n?.cap ?? null;
     hud.canWallet = canUpgradeWallet(battle);
     hud.mana = battle.mana / MANA_MAX;
     hud.manaFull = manaFull(battle);
@@ -155,9 +163,17 @@ function send(id: UnitId) {
     if (summon(battle, id) && tutorial.value === 'summon') tutorial.value = 'fight';
 }
 
+// The wallet made stronger: what changed, shown a moment over the money
+const walletNews = ref<{ rate: number; cap: number; n: number } | null>(null);
+let walletNewsTimer: ReturnType<typeof setTimeout> | undefined;
+
 function wallet() {
     unlockAudio();
-    upgradeWallet(battle);
+    if (!upgradeWallet(battle)) return;
+    const w = walletOf(battle);
+    walletNews.value = { rate: w.rate, cap: w.cap, n: (walletNews.value?.n ?? 0) + 1 };
+    clearTimeout(walletNewsTimer);
+    walletNewsTimer = setTimeout(() => (walletNews.value = null), 2500);
 }
 
 function strokesOf(kanji: string) {
@@ -314,6 +330,7 @@ onBeforeUnmount(() => {
     observer?.disconnect();
     window.removeEventListener('resize', fit);
     clearTimeout(retry);
+    clearTimeout(walletNewsTimer);
     document.removeEventListener('visibilitychange', onVisibility);
 });
 
@@ -333,11 +350,18 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
         </div>
 
         <div ref="hudBox" class="battle-hud">
-            <div class="hud-row">
-                <p class="money" aria-live="off">💰 {{ hud.money }} / {{ hud.cap }}</p>
-                <button type="button" class="btn" :disabled="!hud.canWallet" @click="wallet">
-                    <Furi text="[財布|さいふ]" /> Lv{{ hud.walletLevel }}<template v-if="hud.walletNext !== null">（<Furi :text="`${hud.walletNext}[円|えん]で [強|つよ]く`" />）</template>
+            <div class="hud-row wallet-row">
+                <p class="money" :class="{ 'is-up': walletNews }" aria-live="off">
+                    <span>💰 {{ hud.money }} / {{ hud.cap }}</span>
+                    <small class="money-rate"><Furi :text="`1[秒|びょう]に +${hud.rate}[円|えん]`" /></small>
+                </p>
+                <button type="button" class="btn wallet-btn" :disabled="!hud.canWallet" @click="wallet">
+                    <span><Furi text="[財布|さいふ]" /> Lv{{ hud.walletLevel }}<template v-if="hud.walletNext !== null"> → Lv{{ hud.walletLevel + 1 }}（{{ hud.walletNext }}<Furi text="[円|えん]）" /></template><template v-else>（<Furi text="[最大|さいだい]" />）</template></span>
+                    <small v-if="hud.nextRate !== null" class="wallet-gain"><Furi :text="`たまる [速|はや]さ +${hud.rate}→+${hud.nextRate}・[上限|じょうげん] ${hud.cap}→${hud.nextCap}`" /></small>
                 </button>
+                <p v-if="walletNews" :key="walletNews.n" class="wallet-news" role="status">
+                    <Furi :text="`[財布|さいふ] アップ！ 1[秒|びょう]に +${walletNews.rate}[円|えん]`" />
+                </p>
             </div>
 
             <div class="hud-row magic-row">
@@ -385,6 +409,29 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
 </template>
 
 <style scoped>
+@keyframes wallet-news {
+    0% {
+        opacity: 0;
+        transform: translateY(0.5rem);
+    }
+
+    10%,
+    80% {
+        opacity: 1;
+        transform: none;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes money-up {
+    40% {
+        transform: scale(1.15);
+    }
+}
+
 .battle {
     display: flex;
     flex-direction: column;
@@ -455,10 +502,52 @@ canvas {
     gap: 0.5rem 0.75rem;
 }
 
+.wallet-row {
+    position: relative;
+}
+
 .money {
+    display: grid;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     min-width: 9rem;
+    line-height: 1.3;
+}
+
+.money-rate {
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.money.is-up .money-rate {
+    color: #c2410c;
+}
+
+.wallet-btn {
+    display: grid;
+    justify-items: center;
+    line-height: 1.3;
+}
+
+.wallet-gain {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Over the field's bottom edge: shown without moving anything */
+.wallet-news {
+    position: absolute;
+    bottom: calc(100% + 0.25rem);
+    left: 0;
+    z-index: 2;
+    padding: 0.3rem 0.9rem;
+    border-radius: 999px;
+    background: var(--mark);
+    color: #1c2a4a;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+    white-space: nowrap;
+    pointer-events: none;
 }
 
 .mana {
@@ -502,6 +591,14 @@ canvas {
 }
 
 @media (prefers-reduced-motion: no-preference) {
+    .wallet-news {
+        animation: wallet-news 2.5s ease-out both;
+    }
+
+    .money.is-up {
+        animation: money-up 0.6s ease-out;
+    }
+
     .magic-btn.is-full {
         animation: magic-ready 1.4s ease-in-out infinite alternate;
     }
