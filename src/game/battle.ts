@@ -9,7 +9,7 @@ import {
 import type { SpellEffect, SpellGroup } from '../spell/effects';
 import { ELEMENTS, affinity, type Element } from '../spell/elements';
 import type { SpellGrade } from '../spell/grade';
-import { ELEMENT_BODY, ENEMIES, type EnemyId } from './enemies';
+import { ELEMENT_BODY, ENEMIES, SPLIT_INTO, type EnemyId } from './enemies';
 import type { Spawn, Stage } from './stages';
 import { formOf, unitStats, type UnitId } from './units';
 
@@ -50,12 +50,18 @@ export interface Fighter {
     fighting: boolean;
     money: number;
     mana: number;
+    // ふたご: falls into this many (SPLIT_INTO)
+    split?: number;
+    // こもりうた: heals the enemies near it; ms before it sings again
+    heal?: { amount: number; everyMs: number; range: number };
+    healWait?: number;
 }
 
 // fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
 // spark: a hit on the element it beats; good / weak: a spell that worked well / not well on most;
-// change: the boss changed its element; damage: the harm a spell did to one enemy (a number over it)
-export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect' | 'damage';
+// change: the boss changed its element; damage: the harm a spell did to one enemy (a number over it);
+// heal: an enemy healed by a lullaby; split: a ふたご fell in two
+export type FxKind = SpellGroup | 'fly' | 'shot' | 'stomp' | 'spark' | 'good' | 'weak' | 'change' | 'fizzle' | 'perfect' | 'damage' | 'heal' | 'split';
 
 // Who made it (for the picture only)
 export interface FxWho {
@@ -191,18 +197,41 @@ export function summon(b: Battle, id: UnitId) {
 }
 
 function spawnEnemy(b: Battle, rule: Spawn) {
-    const id: EnemyId = rule.enemy;
-    const e = ENEMIES[id];
     const cycle = rule.element === 'cycle';
     const element: Element | null = rule.element === 'cycle' ? ELEMENTS[0] : rule.element ?? null;
+    enemyAt(b, rule.enemy, element, cycle, LANE.enemyBase + ENEMIES[rule.enemy].size / 2);
+}
+
+function enemyAt(b: Battle, id: EnemyId, element: Element | null, cycle: boolean, x: number) {
+    const e = ENEMIES[id];
     const p = b.stage.power;
     const hp = Math.round(e.hp * p);
-    b.fighters.push({
+    const f: Fighter = {
         id: b.nextId++, side: 'enemy', kind: id, form: 0, element, cycle, age: 0, color: element ? ELEMENT_BODY[element] : e.color, size: e.size, boss: e.boss,
-        x: LANE.enemyBase + e.size / 2, hp, maxHp: hp, attack: Math.round(e.attack * p), attackMs: e.attackMs, range: e.range,
-        speed: e.speed, knockback: 0, area: false, wait: e.attackMs * 0.3, stopMs: 0, shield: 0, hurtMs: 0, fighting: false,
+        x, hp, maxHp: hp, attack: Math.round(e.attack * p), attackMs: e.attackMs, range: e.range,
+        speed: e.speed, knockback: e.knockback ?? 0, area: e.area ?? false, wait: e.attackMs * 0.3, stopMs: 0, shield: 0, hurtMs: 0, fighting: false,
         money: e.money, mana: e.mana
-    });
+    };
+    if (e.split) f.split = e.split;
+    if (e.heal) {
+        f.heal = { ...e.heal, amount: Math.round(e.heal.amount * p) };
+        f.healWait = e.heal.everyMs;
+    }
+    b.fighters.push(f);
+    return f;
+}
+
+// こもりうた: every so often, the enemies near it (itself too) get back some hp
+function sing(b: Battle, f: Fighter, dt: number) {
+    if (!f.heal || f.stopMs > 0) return;
+    f.healWait = (f.healWait ?? f.heal.everyMs) - dt;
+    if (f.healWait > 0) return;
+    f.healWait = f.heal.everyMs;
+    for (const o of b.fighters) {
+        if (o.side !== 'enemy' || o.hp <= 0 || o.hp >= o.maxHp || Math.abs(o.x - f.x) > f.heal.range) continue;
+        o.hp = Math.min(o.maxHp, o.hp + f.heal.amount);
+        b.fx.push({ kind: 'heal', x: o.x, ms: 0, total: 900, who: whoOf(o) });
+    }
 }
 
 // --- The magic ---
@@ -341,7 +370,8 @@ function fight(b: Battle, f: Fighter, dt: number) {
         const hit = f.area
             ? b.fighters.filter(o => o.side !== f.side && o.hp > 0 && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range)
             : [foe];
-        if (f.area) b.fx.push({ kind: 'stomp', x: f.x, ms: 0, total: 450, who: whoOf(f) });
+        // The ground shakes where it hits (far off for one that throws)
+        if (f.area) b.fx.push({ kind: 'stomp', x: f.range > 100 ? foe.x : f.x, ms: 0, total: 450, who: whoOf(f) });
         for (const o of hit) {
             const k = affinity(f.element, o.element, 'unit');
             harm(o, power * k);
@@ -394,6 +424,7 @@ export function step(b: Battle, dt: number) {
         if (f.element !== before) b.fx.push({ kind: 'change', x: f.x, ms: 0, total: 1500, who: whoOf(f) });
     }
     for (const f of b.fighters) if (f.hp > 0) fight(b, f, dt);
+    for (const f of b.fighters) if (f.hp > 0 && f.heal) sing(b, f, dt);
 
     for (const f of b.fighters) {
         if (f.hp > 0) continue;
@@ -403,6 +434,9 @@ export function step(b: Battle, dt: number) {
             b.mana = Math.min(MANA_MAX, b.mana + f.mana);
             b.kills++;
             b.events.push('fall');
+            // ふたご: two come out where it fell
+            for (let k = 0; k < (f.split ?? 0); k++) enemyAt(b, SPLIT_INTO, f.element, false, Math.max(LANE.enemyBase + 20, f.x - 22 + k * 30));
+            if (f.split) b.fx.push({ kind: 'split', x: f.x, ms: 0, total: 700, who: whoOf(f) });
         }
     }
     b.fighters = b.fighters.filter(f => f.hp > 0);

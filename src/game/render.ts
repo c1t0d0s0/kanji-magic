@@ -199,7 +199,20 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             if (fx.who && fx.to !== undefined) drawShot(ctx, fx.who, fx.x, fx.to, GROUND, t, fx.ms);
             break;
         case 'stomp':
-            drawStomp(ctx, fx.x, GROUND, t);
+            // The hippo's stamp, the alarm clock's ring, the king's dream cloud
+            drawStomp(ctx, fx.x, GROUND, t, fx.who?.kind === 'bell' ? 'ジリリリ！' : fx.who?.kind === 'king' ? 'もくもく〜' : 'ドスン');
+            break;
+        case 'heal':
+            // A lullaby healed it: a green ＋ rises
+            if (fx.who) shout(ctx, '＋', fx.x, GROUND - fx.who.size * DRAW_SCALE - 10 - t * 30, 26, '#2b9348', fade * 1.5);
+            break;
+        case 'split':
+            // A ふたご came apart: a puff and パカッ
+            ctx.fillStyle = `rgb(255 255 255 / ${0.8 * fade})`;
+            ctx.beginPath();
+            ctx.arc(fx.x, GROUND - 30, 20 + 40 * t, 0, Math.PI * 2);
+            ctx.fill();
+            shout(ctx, 'パカッ', fx.x, GROUND - 90 - t * 20, 22, '#b5179e', fade * 1.5);
             break;
         case 'spark':
             // A hit on the element it beats: stars burst out

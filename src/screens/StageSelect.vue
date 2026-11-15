@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// --- The 10 stages: cleared ones with their stars, the next one open, the rest locked ---
+// --- The 20 stages: cleared ones with their stars, the next one open, the rest locked ---
 import Furi from '../components/Furi.vue';
 import ElementMark from '../components/ElementMark.vue';
 import { STAGES, stageEnemies } from '../game/stages';
@@ -18,7 +18,7 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 </script>
 
 <template>
-    <main class="screen">
+    <main class="screen stage-select">
         <header class="screen-head">
             <button type="button" class="btn" @click="go('title')"><Furi text="[戻|もど]る" /></button>
             <h1><Furi text="ステージを [選|えら]ぼう" /></h1>
@@ -28,9 +28,14 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
             <li v-for="s in STAGES" :key="s.id">
                 <button type="button" class="stage card" :disabled="!isOpen(s.id)" @click="choose(s.id)">
                     <span class="stage-no">{{ s.id }}</span>
-                    <span class="stage-name"><Furi :text="isOpen(s.id) ? s.name : '？？？'" /><span v-if="s.boss && isOpen(s.id)" aria-label="ボス"> 👹</span><span v-if="isOpen(s.id)" class="stage-marks"><ElementMark v-for="m in marksOf(s.id)" :key="m" :mark="m" :size="18" /></span></span>
-                    <span v-if="!isOpen(s.id)" class="stage-lock" aria-label="まだ 遊べないよ">🔒</span>
-                    <span v-else class="stars" :aria-label="`星 ${save.stages[s.id]?.stars ?? 0}こ`">{{ stars(save.stages[s.id]?.stars ?? 0) }}</span>
+                    <span class="stage-name"><Furi :text="isOpen(s.id) ? s.name : '？？？'" /></span>
+                    <span class="stage-info">
+                        <template v-if="isOpen(s.id)">
+                            <span class="stage-marks"><span v-if="s.boss" class="boss" aria-label="ボス">👹</span><ElementMark v-for="m in marksOf(s.id)" :key="m" :mark="m" :size="18" /></span>
+                            <span class="stars" :aria-label="`星 ${save.stages[s.id]?.stars ?? 0}こ`">{{ stars(save.stages[s.id]?.stars ?? 0) }}</span>
+                        </template>
+                        <span v-else class="stage-lock" aria-label="まだ 遊べないよ">🔒</span>
+                    </span>
                 </button>
             </li>
         </ol>
@@ -50,11 +55,14 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 
 .stage {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    /* Every stage the same: the number on the left; the name, then the marks and the stars */
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.1rem 0.75rem;
     width: 100%;
-    min-height: 4rem;
+    height: 100%;
+    padding-block: 0.4rem;
     font: inherit;
     color: inherit;
     text-align: left;
@@ -67,6 +75,7 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
 }
 
 .stage-no {
+    grid-row: span 2;
     display: grid;
     place-items: center;
     width: 2.4rem;
@@ -77,19 +86,49 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
     font-weight: 700;
 }
 
-.stage-marks {
-    display: inline-flex;
-    gap: 0.15rem;
-    margin-left: 0.4rem;
-}
-
+/* One line, with room for the furigana whether it has some or not */
 .stage-name {
+    overflow: hidden;
     font-family: var(--hand);
     font-weight: 600;
+    line-height: 2.1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.stage-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    min-height: 1.5rem;
+}
+
+.stage-marks {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.boss {
+    font-size: 1rem;
+    line-height: 1;
 }
 
 .hint {
     color: var(--muted);
     font-size: 1rem;
+}
+
+/* On a wide screen (a PC): 4 in a row, so the 20 fit with no scrolling */
+@media (min-width: 64em) {
+    .stage-select {
+        max-width: 80rem;
+    }
+
+    .stages {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.45rem;
+    }
 }
 </style>

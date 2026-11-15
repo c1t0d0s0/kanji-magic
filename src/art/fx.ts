@@ -42,11 +42,14 @@ export function drawShot(ctx: Ctx, who: FxWho, x: number, to: number, ground: nu
     const px = x + (to - x) * t;
     const py = ground - who.size * 0.6 - Math.sin(Math.PI * t) * 90;
     if (who.kind === 'neko') fluff(ctx, px, py, 8, who.color, ms);
+    // こもりうた: a note; まおう: a dark dream cloud
+    else if (who.kind === 'singer') shout(ctx, '♪', px, py, 26, '#e0569b');
+    else if (who.kind === 'king') fluff(ctx, px, py, 20, '#7b2cbf', ms);
     else pillow(ctx, px, py, 26, ms / 60);
 }
 
 // The stamp of the hippo: rings on the ground, and dust
-export function drawStomp(ctx: Ctx, x: number, ground: number, t: number) {
+export function drawStomp(ctx: Ctx, x: number, ground: number, t: number, sound = 'ドスン') {
     const fade = 1 - t;
     ctx.save();
     ctx.strokeStyle = `rgb(120 90 60 / ${fade})`;
@@ -66,7 +69,7 @@ export function drawStomp(ctx: Ctx, x: number, ground: number, t: number) {
     if (t < 0.6) {
         line(ctx, [[x - 30, ground - 30], [x - 40, ground - 45]], 3, `rgb(80 60 40 / ${fade})`);
         line(ctx, [[x + 30, ground - 30], [x + 40, ground - 45]], 3, `rgb(80 60 40 / ${fade})`);
-        shout(ctx, 'ドスン', x, ground - 80, 18, '#7b2d8b', fade);
+        shout(ctx, sound, x, ground - 80, 18, '#7b2d8b', fade);
     }
     ctx.restore();
 }

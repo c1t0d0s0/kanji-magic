@@ -1,4 +1,4 @@
-// --- The 10 stages (requirements 5.4): data only, battle.ts plays them ---
+// --- The 20 stages (requirements 5.4): data only, battle.ts plays them ---
 // The enemies are the same in every grade (the kanji are what get harder). Each spawn rule sends
 // one enemy at `from` seconds, then one every `every` seconds, `count` times at most. A stage takes
 // 2 to 4 minutes (checked by tests/battle.test.ts with a simple player). The enemies of a rule have
@@ -69,10 +69,57 @@ export const STAGES: readonly Stage[] = [
         spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 5 }, { enemy: 'hard', element: 'wood', from: 15, every: 22 }, { enemy: 'fast', element: 'water', from: 25, every: 14 }, { enemy: 'thrower', element: 'fire', from: 35, every: 18 }]
     },
     {
-        id: 10, name: '[最後|さいご]の [戦|たたか]い', power: 2.6, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 120, boss: true,
+        id: 10, name: 'にじいろの [大広間|おおひろま]', power: 2.6, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 120, boss: true,
         spawns: [
             { enemy: 'zako', element: 'wood', from: 2, every: 7 }, { enemy: 'fast', element: 'water', from: 15, every: 18 }, { enemy: 'hard', element: 'fire', from: 25, every: 30 },
             { enemy: 'boss', element: 'cycle', from: 50, every: 1, count: 1 }, { enemy: 'thrower', element: 'water', from: 60, every: 24 }, { enemy: 'boss', element: 'cycle', from: 150, every: 1, count: 1 }
+        ]
+    },
+    // --- From the 11th: the new enemies, one by one, then all together ---
+    {
+        id: 11, name: 'りんりん [時計台|とけいだい]', power: 4.6, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 65,
+        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'bell', element: 'fire', from: 15, every: 18 }, { enemy: 'fast', element: 'wood', from: 30, every: 16 }]
+    },
+    {
+        id: 12, name: 'ふかふか [雲|くも]の [道|みち]', power: 4.8, enemyBaseHp: 11500, allyBaseHp: 3200, reward: 70,
+        spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 6 }, { enemy: 'fluffy', element: 'fire', from: 20, every: 28 }, { enemy: 'thrower', element: 'wood', from: 30, every: 20 }]
+    },
+    {
+        id: 13, name: 'ふたごの [沼|ぬま]', power: 5.2, enemyBaseHp: 12000, allyBaseHp: 3400, reward: 75,
+        spawns: [{ enemy: 'zako', element: 'wood', from: 3, every: 7 }, { enemy: 'twin', element: 'wood', from: 6, every: 13 }, { enemy: 'hard', element: 'water', from: 40, every: 30 }]
+    },
+    {
+        id: 14, name: 'こもりうたの [湖|みずうみ]', power: 6.0, enemyBaseHp: 12000, allyBaseHp: 3400, reward: 80,
+        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'singer', element: 'water', from: 20, every: 25 }, { enemy: 'hard', element: 'water', from: 30, every: 28 }, { enemy: 'fast', element: 'fire', from: 45, every: 18 }]
+    },
+    {
+        id: 15, name: 'ゆめのまおうの [塔|とう]', power: 3, enemyBaseHp: 12000, allyBaseHp: 3600, reward: 130, boss: true,
+        spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 4 }, { enemy: 'bell', element: 'water', from: 20, every: 18 }, { enemy: 'king', element: 'wood', from: 50, every: 1, count: 1 }, { enemy: 'singer', element: 'fire', from: 70, every: 30 }]
+    },
+    {
+        id: 16, name: '[真夜中|まよなか]の [町|まち]', power: 7.2, enemyBaseHp: 13000, allyBaseHp: 3600, reward: 85,
+        spawns: [{ enemy: 'fast', element: 'water', from: 3, every: 6 }, { enemy: 'twin', element: 'water', from: 15, every: 14 }, { enemy: 'thrower', element: 'water', from: 25, every: 20 }, { enemy: 'fluffy', element: 'fire', from: 35, every: 30 }]
+    },
+    {
+        id: 17, name: '[星降|ほしふ]る [丘|おか]', power: 3.9, enemyBaseHp: 13500, allyBaseHp: 3800, reward: 90,
+        spawns: [{ enemy: 'zako', element: 'wood', from: 2, every: 5 }, { enemy: 'bell', element: 'fire', from: 12, every: 16 }, { enemy: 'singer', element: 'water', from: 30, every: 26 }, { enemy: 'hard', element: 'fire', from: 40, every: 28 }]
+    },
+    {
+        id: 18, name: '[眠|ねむ]りの [海|うみ]', power: 6.2, enemyBaseHp: 14000, allyBaseHp: 3800, reward: 95,
+        spawns: [{ enemy: 'fast', element: 'fire', from: 3, every: 6 }, { enemy: 'fluffy', element: 'water', from: 15, every: 26 }, { enemy: 'twin', element: 'wood', from: 25, every: 15 }, { enemy: 'singer', element: 'water', from: 40, every: 28 }]
+    },
+    {
+        id: 19, name: 'わすれ[山脈|さんみゃく]', power: 5.5, enemyBaseHp: 14500, allyBaseHp: 4000, reward: 100,
+        spawns: [
+            { enemy: 'zako', element: 'fire', from: 2, every: 5 }, { enemy: 'bell', element: 'water', from: 12, every: 18 }, { enemy: 'twin', element: 'wood', from: 20, every: 16 },
+            { enemy: 'fluffy', element: 'fire', from: 35, every: 30 }, { enemy: 'singer', element: 'wood', from: 45, every: 30 }
+        ]
+    },
+    {
+        id: 20, name: '[夢|ゆめ]の [果|は]て', power: 3.8, enemyBaseHp: 15000, allyBaseHp: 4200, reward: 200, boss: true,
+        spawns: [
+            { enemy: 'zako', element: 'water', from: 2, every: 7 }, { enemy: 'twin', element: 'fire', from: 15, every: 18 }, { enemy: 'bell', element: 'wood', from: 25, every: 24 },
+            { enemy: 'king', element: 'cycle', from: 50, every: 1, count: 1 }, { enemy: 'singer', element: 'water', from: 70, every: 30 }, { enemy: 'boss', element: 'cycle', from: 150, every: 1, count: 1 }
         ]
     }
 ];

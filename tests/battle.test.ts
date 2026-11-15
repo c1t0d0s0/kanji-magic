@@ -3,7 +3,7 @@ import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, LANE, MANA_MAX, MANA_REFU
 import {
     canSummon, castSpell, createBattle, manaFull, rewardOf, spellRating, starsOf, startSpell, step, summon, upgradeWallet, type Battle
 } from '../src/game/battle';
-import { ENEMIES } from '../src/game/enemies';
+import { ENEMIES, ENEMY_IDS, SPLIT_INTO } from '../src/game/enemies';
 import { STAGES, stageById, type Stage } from '../src/game/stages';
 import { UNITS, formOf, levelPower, unitStats, unlockedUnits } from '../src/game/units';
 import { spellEffect } from '../src/spell/effects';
@@ -27,13 +27,20 @@ const enemyAt = (b: Battle, x: number, id: keyof typeof ENEMIES = 'zako', elemen
 };
 
 describe('stages and units', () => {
-    it('has 10 stages; the 1st is the tutorial, bosses come in the 5th and the 10th', () => {
-        expect(STAGES.map(s => s.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    it('has 20 stages; the 1st is the tutorial, bosses come every 5th', () => {
+        expect(STAGES.map(s => s.id)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
         expect(STAGES[0].tutorial).toBe(true);
         for (const s of STAGES) {
-            expect(s.spawns.some(r => r.enemy === 'boss'), `stage ${s.id}`).toBe(s.id === 5 || s.id === 10);
-            expect(s.boss ?? false).toBe(s.id === 5 || s.id === 10);
+            expect(s.spawns.some(r => ENEMIES[r.enemy].boss), `stage ${s.id}`).toBe(s.id % 5 === 0);
+            expect(s.boss ?? false).toBe(s.id % 5 === 0);
         }
+    });
+
+    it('has 10 kinds of enemies, each seen in some stage', () => {
+        expect(ENEMY_IDS).toHaveLength(10);
+        expect(Object.keys(ENEMIES).sort()).toEqual([...ENEMY_IDS].sort());
+        const seen = new Set(STAGES.flatMap(s => s.spawns.map(r => r.enemy)));
+        for (const id of ENEMY_IDS) expect(seen.has(id), id).toBe(true);
     });
 
     it('gives 2 or 3 units at first, more as the stages are cleared', () => {
@@ -202,16 +209,16 @@ describe('a whole stage (a simple player)', () => {
             expect(b.time, `stage ${s.id}`).toBeGreaterThan(55000);
             expect(b.time, `stage ${s.id}`).toBeLessThan(360000);
         }
-    }, 120000);
+    }, 300000);
 
     it('doing nothing loses every stage', () => {
         for (const s of STAGES) expect(autoplay(s, { spell: null, level: 1, idle: true }).result, `stage ${s.id}`).toBe('lose');
-    }, 60000);
+    }, 300000);
 
     it('the last stages need the magic', () => {
         const without = STAGES.filter(s => s.id >= 8).map(s => autoplay(s, { spell: null, level: levelAt(s.id) }).result);
         expect(without.every(r => r !== 'win')).toBe(true);
-    }, 120000);
+    }, 300000);
 
     it('choosing by the elements wins the later stages sooner (or at all)', () => {
         for (const s of STAGES.filter(st => st.id >= 5 && st.id <= 9)) {
@@ -220,7 +227,7 @@ describe('a whole stage (a simple player)', () => {
             expect(best.result, `stage ${s.id}`).toBe('win');
             if (worst.result === 'win') expect(best.time, `stage ${s.id}`).toBeLessThan(worst.time * 0.9);
         }
-    }, 120000);
+    }, 300000);
 
     it('the same battle plays the same way', () => {
         const a = autoplay(stageById(3), { spell: 'success', level: 2 });
@@ -283,6 +290,85 @@ describe('the elements', () => {
         }
         expect(new Set(seen).size).toBe(3);
         expect(b.fx.some(f => f.kind === 'change')).toBe(true);
+    });
+});
+
+describe('the new enemies', () => {
+    // One enemy of a kind, sent by the stage as in a battle (with all it can do)
+    const sendOne = (id: keyof typeof ENEMIES, deck: { id: 'kaba' | 'kaeru' | 'purun'; level: number }[] = []) => {
+        const b = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [{ enemy: id, from: 0, every: 1, count: 1 }] }, deck);
+        step(b, DT);
+        return { b, e: b.fighters.find(f => f.kind === id)! };
+    };
+
+    it('ふたご falls into two わすれんぼう where it was', () => {
+        const { b, e } = sendOne('twin');
+        e.x = 400;
+        e.hp = 0;
+        step(b, DT);
+        const minis = b.fighters.filter(f => f.kind === SPLIT_INTO);
+        expect(minis).toHaveLength(ENEMIES.twin.split!);
+        for (const m of minis) expect(Math.abs(m.x - 400)).toBeLessThan(40);
+        expect(b.fx.some(f => f.kind === 'split')).toBe(true);
+        // They do not split again
+        for (const m of minis) m.hp = 0;
+        step(b, DT);
+        expect(b.fighters).toHaveLength(0);
+    });
+
+    it('こもりうた heals the enemies near it, not those far off', () => {
+        const { b, e } = sendOne('singer');
+        e.x = 300;
+        e.speed = 0;
+        const near = enemyAt(b, 380, 'hard'), far = enemyAt(b, 300 + ENEMIES.singer.heal!.range + 100, 'hard');
+        near.speed = far.speed = 0;
+        near.hp = far.hp = 100;
+        run(b, ENEMIES.singer.heal!.everyMs + 100);
+        expect(near.hp).toBe(100 + ENEMIES.singer.heal!.amount);
+        expect(far.hp).toBe(100);
+        expect(b.fx.some(f => f.kind === 'heal')).toBe(true);
+    });
+
+    it('めざまし hits all of ours near it at once; ふかふか pushes ours back', () => {
+        const hits = (id: 'bell' | 'zako') => {
+            const b = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [] }, [{ id: 'kaba', level: 1 }, { id: 'purun', level: 1 }]);
+            b.money = 1e5;
+            summon(b, 'kaba');
+            run(b, 5000);
+            summon(b, 'purun');
+            const ours = b.fighters.filter(f => f.side === 'ally');
+            for (const o of ours) {
+                o.speed = 0;
+                o.attack = 0;
+                o.x = 420;
+            }
+            const e = enemyAt(b, 420 - 60, id);
+            e.area = ENEMIES[id].area ?? false;
+            e.wait = 0;
+            step(b, DT);
+            return ours.filter(o => o.hp < o.maxHp).length;
+        };
+        expect(hits('bell')).toBe(2);
+        expect(hits('zako')).toBe(1);
+
+        const { b, e } = sendOne('fluffy', [{ id: 'purun', level: 1 }]);
+        b.money = 1e5;
+        e.x = 400;
+        e.speed = 0;
+        e.wait = 0;
+        summon(b, 'purun');
+        const u = b.fighters.find(f => f.side === 'ally')!;
+        u.speed = 0;
+        u.x = 400 + (u.size + e.size) / 2 + 10;
+        const before = u.x;
+        step(b, DT);
+        expect(u.x).toBeCloseTo(before + ENEMIES.fluffy.knockback!);
+    });
+
+    it('ゆめのまおう is a boss that throws far, on all of ours there', () => {
+        expect(ENEMIES.king.boss).toBe(true);
+        expect(ENEMIES.king.area).toBe(true);
+        expect(ENEMIES.king.range).toBeGreaterThan(100);
     });
 });
 

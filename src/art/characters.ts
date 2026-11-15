@@ -401,11 +401,33 @@ interface Sleepy {
     wheels?: boolean;
     pillow?: boolean;
     crown?: boolean;
+    // めざまし: an alarm clock on the head instead of the cap; it rings when it hits
+    clock?: boolean;
+    // ふかふか: soft puffs all round
+    puffs?: boolean;
+    // ふたご: a smaller one leaning on it, with a cap of this colour
+    twin?: string;
+    // こもりうた: notes float up as it sings
+    notes?: boolean;
+    // ゆめのまおう: a tall wizard hat with a moon, and a cape
+    wizard?: boolean;
 }
+
+const twinOf = new Map<string, Draw>();
 
 function sleepy(o: Sleepy): Draw {
     return (ctx, s, p) => {
         const c = p.color;
+        if (o.wizard) {
+            // The cape, behind all, flapping a little
+            const flap = Math.sin(p.t / 260 + p.seed) * s * 0.04;
+            ctx.beginPath();
+            ctx.moveTo(-s * 0.3, -s * 0.62);
+            ctx.quadraticCurveTo(-s * 0.75, -s * 0.3, -s * 0.62 + flap, -s * 0.02);
+            ctx.lineTo(s * 0.1, -s * 0.06);
+            ctx.closePath();
+            paint(ctx, '#5a189a', s);
+        }
         const sway = Math.sin(p.t / 500 + p.seed) * 0.06;
         const b = bounce(p, o.wheels ? 70 : 170) * s * 0.06;
         // Legs: little feet, or a spinning wheel of legs for the fast one
@@ -430,18 +452,24 @@ function sleepy(o: Sleepy): Draw {
         ctx.quadraticCurveTo(0, 0, -s * 0.15, -s * 0.1);
         ctx.quadraticCurveTo(-s * 0.3, -s * 0.02, -s * 0.46, -s * 0.15);
         paint(ctx, c, s);
+        if (o.puffs) {
+            // A futon of a body: puffs on its sides and top
+            for (const [x, y, r] of [[-s * 0.44, -s * 0.3, 0.14], [s * 0.44, -s * 0.3, 0.14], [-s * 0.3, -s * 0.66, 0.12], [s * 0.3, -s * 0.66, 0.12], [-s * 0.42, -s * 0.12, 0.1], [s * 0.42, -s * 0.12, 0.1]] as const) {
+                fluff(ctx, x, y, s * r, shade(c, 0.08), p.t * 0.3 + x);
+            }
+        }
         // Sleepy face, awake with a start when hit
         const f = faceOf(p, 'half', 'o');
         const yawn = f.mouth === 'o' && Math.sin(p.t / 900 + p.seed * 3) > 0.7;
         const eyes = p.hurt > 0.2 ? 'wide' : yawn ? 'closed' : f.eyes;
         eye(ctx, s * 0.05, -s * 0.45, s * 0.1, eyes, p.t, 0.5);
         eye(ctx, s * 0.28, -s * 0.45, s * 0.1, eyes, p.t, 0.5);
-        if (o.crown) {
+        if (o.crown || o.wizard) {
             // Grumpy eyebrows of the king
             line(ctx, [[-s * 0.05, -s * 0.6], [s * 0.12, -s * 0.56]], s * 0.05);
             line(ctx, [[s * 0.38, -s * 0.6], [s * 0.21, -s * 0.56]], s * 0.05);
         }
-        mouth(ctx, s * 0.17, -s * 0.28, s * 0.2, p.hurt > 0.2 ? 'open' : yawn ? 'yawn' : f.mouth, p.t);
+        mouth(ctx, s * 0.17, -s * 0.28, s * 0.2, p.hurt > 0.2 ? 'open' : o.notes ? 'o' : yawn ? 'yawn' : f.mouth, p.t);
         blush(ctx, -s * 0.1, -s * 0.32, s * 0.06);
         if (o.helmet) {
             // A pot on the head; it rings when hit
@@ -454,6 +482,54 @@ function sleepy(o: Sleepy): Draw {
             paint(ctx, '#6c7a91', s);
             line(ctx, [[s * 0.45, -s * 0.66], [s * 0.7, -s * 0.72]], s * 0.07, OUTLINE);
             oval(ctx, -s * 0.15, -s * 0.75, s * 0.08, s * 0.04, 'rgb(255 255 255 / 0.6)', s, false);
+        } else if (o.clock) {
+            // An alarm clock: two bells, a face with hands; it shakes when it rings
+            const ring = p.attack > 0 || p.windup > 0.6;
+            const shake = ring ? Math.sin(p.t / 18) * s * 0.03 : 0;
+            ctx.save();
+            ctx.translate(shake, 0);
+            oval(ctx, -s * 0.22, -s * 0.98, s * 0.11, s * 0.09, '#e9c46a', s);
+            oval(ctx, s * 0.22, -s * 0.98, s * 0.11, s * 0.09, '#e9c46a', s);
+            line(ctx, [[-s * 0.18, -s * 0.62], [-s * 0.26, -s * 0.55]], s * 0.05);
+            line(ctx, [[s * 0.18, -s * 0.62], [s * 0.26, -s * 0.55]], s * 0.05);
+            oval(ctx, 0, -s * 0.8, s * 0.24, s * 0.22, '#f4a261', s);
+            oval(ctx, 0, -s * 0.8, s * 0.17, s * 0.15, '#fff', s * 0.6);
+            const a = p.t / 600;
+            line(ctx, [[0, -s * 0.8], [Math.cos(a) * s * 0.1, -s * 0.8 + Math.sin(a) * s * 0.1]], s * 0.035);
+            line(ctx, [[0, -s * 0.8], [0, -s * 0.9]], s * 0.035);
+            ctx.restore();
+            if (ring) {
+                for (const k of [-1, 1]) {
+                    line(ctx, [[k * s * 0.38, -s * 1.02], [k * s * 0.5, -s * 1.1]], s * 0.035, '#e76f51');
+                    line(ctx, [[k * s * 0.4, -s * 0.9], [k * s * 0.55, -s * 0.9]], s * 0.035, '#e76f51');
+                }
+            }
+        } else if (o.wizard) {
+            // A tall wizard hat, its tip bent, a moon and stars on it
+            const tip = Math.sin(p.t / 400 + p.seed) * s * 0.05;
+            ctx.beginPath();
+            ctx.moveTo(-s * 0.42, -s * 0.62);
+            ctx.lineTo(-s * 0.08, -s * 1.3);
+            ctx.quadraticCurveTo(s * 0.12, -s * 1.45, s * 0.35 + tip, -s * 1.32);
+            ctx.quadraticCurveTo(s * 0.12, -s * 1.25, s * 0.42, -s * 0.62);
+            ctx.closePath();
+            paint(ctx, '#3c096c', s);
+            ctx.beginPath();
+            ctx.roundRect(-s * 0.52, -s * 0.68, s * 1.04, s * 0.1, s * 0.05);
+            paint(ctx, '#7b2cbf', s);
+            // The moon: two circles
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, -s * 0.95, s * 0.11, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd23f';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(s * 0.05, -s * 0.98, s * 0.09, 0, Math.PI * 2);
+            ctx.fillStyle = '#3c096c';
+            ctx.fill();
+            ctx.restore();
+            star(ctx, -s * 0.2, -s * 0.78, s * 0.05);
+            star(ctx, s * 0.2, -s * 1.1, s * 0.04);
         } else {
             // A nightcap, its tip flopping behind
             const tip = Math.sin(p.t / 300 + p.seed) * s * 0.06;
@@ -496,12 +572,32 @@ function sleepy(o: Sleepy): Draw {
             star(ctx, -s * 0.4, -s * 0.85, s * 0.1);
             star(ctx, s * 0.45, -s * 0.9, s * 0.08);
         }
+        if (o.notes && p.mood !== 'dizzy') {
+            // The lullaby: notes rise and fade
+            for (let k = 0; k < 2; k++) {
+                const u = ((p.t / 1400 + k * 0.5 + p.seed) % 1 + 1) % 1;
+                shout(ctx, k ? '♫' : '♪', -s * 0.4 - u * s * 0.25 + k * s * 0.2, -s * (0.85 + u * 0.6), s * 0.42, '#d6336c', Math.min(1, (1 - u) * 1.6));
+            }
+        }
+        if (o.wizard && p.mood !== 'dizzy') {
+            const k = (p.t + p.seed * 1000) % 10000;
+            if (k < 2500) shout(ctx, k < 1200 ? 'ねむれ〜…' : 'ぜんぶ わすれろ〜', 0, -s * 1.6, Math.max(14, s * 0.2), '#3c096c');
+        }
         if (o.crown && p.mood !== 'dizzy') {
             // Talking in its sleep now and then
             const k = (p.t + p.seed * 1000) % 9000;
             if (k < 2500) shout(ctx, k < 1200 ? 'むにゃむにゃ…' : 'なんだっけ？', 0, -s * 1.35, Math.max(14, s * 0.2), '#5b3f8c');
         }
         extras(ctx, s, p, -s * 0.85);
+        if (o.twin) {
+            // The small one, in front at its side, hand in hand
+            let small = twinOf.get(o.twin);
+            if (!small) twinOf.set(o.twin, (small = sleepy({ cap: o.twin })));
+            ctx.save();
+            ctx.translate(s * 0.48, 0);
+            small(ctx, s * 0.6, { ...p, seed: p.seed + 1.7, color: shade(c, 0.12) });
+            ctx.restore();
+        }
     };
 }
 
@@ -527,5 +623,10 @@ export const ART: Record<UnitId | EnemyId, Draw> = {
     hard: sleepy({ cap: '#8d99ae', helmet: true }),
     fast: sleepy({ cap: '#ff9f1c', wheels: true }),
     thrower: sleepy({ cap: '#4cc9a0', pillow: true }),
-    boss: sleepy({ cap: '#e5383b', crown: true })
+    boss: sleepy({ cap: '#e5383b', crown: true }),
+    bell: sleepy({ cap: '#e9c46a', clock: true }),
+    fluffy: sleepy({ cap: '#a8dadc', puffs: true }),
+    twin: sleepy({ cap: '#b5179e', twin: '#f72585' }),
+    singer: sleepy({ cap: '#ff8fab', notes: true }),
+    king: sleepy({ cap: '#3c096c', wizard: true })
 };
