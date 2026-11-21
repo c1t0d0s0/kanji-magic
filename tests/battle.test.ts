@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET } from '../src/config';
+import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET, WAVE } from '../src/config';
 import {
-    canSummon, castSpell, createBattle, enemyMagicSoon, guarded, manaFull, rewardOf, spellRating, starsOf, startSpell, step, summon, upgradeWallet, type Battle
+    BURN_MS, canSummon, castSpell, createBattle, enemyMagicSoon, guarded, manaFull, rewardOf, spellRating, spellTips, starsOf, startSpell, step, summon, upgradeWallet, waveEnemies,
+    waveSoon, type Battle
 } from '../src/game/battle';
 import { ENEMIES, ENEMY_IDS, SPLIT_INTO } from '../src/game/enemies';
 import { STAGES, stageById, type Stage } from '../src/game/stages';
@@ -202,12 +203,32 @@ describe('a whole stage (a simple player)', () => {
     // Levels a child may have reached at each stage
     const levelAt = (id: number) => 1 + Math.floor((id - 1) / 2);
 
-    it('each stage is won with spells that succeed, chosen by the elements, in 1 to 6 minutes', () => {
+    // To the 10th the elements are enough; from the 11th the tips have to be read too (choose 'smart')
+    const wayOf = (id: number) => (id <= 10 ? 'best' : 'smart') as 'best' | 'smart';
+
+    it('each stage is won with spells that succeed, chosen by the elements (and the tips), in 1 to 6 minutes', () => {
         for (const s of STAGES) {
-            const b = autoplay(s, { spell: 'success', level: levelAt(s.id) });
+            const b = autoplay(s, { spell: 'success', level: levelAt(s.id), choose: wayOf(s.id) });
             expect(b.result, `stage ${s.id}`).toBe('win');
             expect(b.time, `stage ${s.id}`).toBeGreaterThan(55000);
             expect(b.time, `stage ${s.id}`).toBeLessThan(360000);
+        }
+    }, 300000);
+
+    it('from the 11th, the way that won the first 10 does not win, even 2 levels up', () => {
+        for (const s of STAGES.filter(st => st.id >= 11)) {
+            for (const level of [levelAt(s.id), Math.min(10, levelAt(s.id) + 2)]) {
+                expect(autoplay(s, { spell: 'success', level }).result, `stage ${s.id} Lv${level}`).not.toBe('win');
+            }
+        }
+    }, 300000);
+
+    it('from the 11th, a stage is won when its power is a little other, too', () => {
+        for (const s of STAGES.filter(st => st.id >= 11)) {
+            for (const k of [0.97, 1.03]) {
+                const b = autoplay({ ...s, power: s.power * k }, { spell: 'success', level: levelAt(s.id), choose: 'smart' });
+                expect(b.result, `stage ${s.id} ×${k}`).toBe('win');
+            }
         }
     }, 300000);
 
@@ -216,7 +237,7 @@ describe('a whole stage (a simple player)', () => {
     }, 300000);
 
     it('the last stages need the magic', () => {
-        const without = STAGES.filter(s => s.id >= 8).map(s => autoplay(s, { spell: null, level: levelAt(s.id) }).result);
+        const without = STAGES.filter(s => s.id >= 8).map(s => autoplay(s, { spell: null, level: levelAt(s.id), choose: wayOf(s.id) }).result);
         expect(without.every(r => r !== 'win')).toBe(true);
     }, 300000);
 
@@ -370,6 +391,160 @@ describe('the new enemies', () => {
         expect(ENEMIES.king.area).toBe(true);
         expect(ENEMIES.king.range).toBeGreaterThan(100);
     });
+
+    // One of ours (level 1) right in front of an enemy that does not move, and the harm of its first hit
+    const firstHit = (id: keyof typeof ENEMIES, unit: 'purun' | 'kaeru' | 'neko' | 'pengin' | 'kaba') => {
+        const { b, e } = sendOne(id, [{ id: unit, level: 1 } as never]);
+        b.money = 1e5;
+        e.x = 400;
+        e.speed = 0;
+        e.attack = 0;
+        summon(b, unit);
+        const u = b.fighters.find(f => f.side === 'ally')!;
+        u.x = 400 + (u.size + e.size) / 2 + 2;
+        u.wait = 0;
+        const hp = e.hp, x = e.x;
+        step(b, DT);
+        return { harm: hp - e.hp, moved: e.x - x, plain: UNITS[unit].attack };
+    };
+
+    it('ふかふか: only the カバ hurts it well (the others a little), and it is not pushed back', () => {
+        expect(ENEMIES.fluffy.counters).toEqual(['kaba']);
+        expect(firstHit('fluffy', 'kaba').harm).toBeCloseTo(UNITS.kaba.attack * ENEMIES.fluffy.bane!);
+        const kaeru = firstHit('fluffy', 'kaeru');
+        expect(kaeru.harm).toBeCloseTo(UNITS.kaeru.attack * ENEMIES.fluffy.soft!);
+        expect(firstHit('fluffy', 'pengin').moved).toBe(0);
+        expect(firstHit('zako', 'pengin').moved).toBeLessThan(0);
+        // The spells are not softened; the water does not push it, the wood stops it
+        const b = createBattle(quiet, []);
+        const e = enemyAt(b, 500, 'fluffy');
+        e.heavy = true;
+        e.soft = { part: ENEMIES.fluffy.soft!, bane: 2, except: ['kaba'] };
+        e.hp = e.maxHp = 5000;
+        const water = spellEffect('海', 'success', 9)!;
+        castSpell(b, water, 'success');
+        expect(e.x).toBe(500);
+        expect(e.maxHp - e.hp).toBe(water.kind === 'attack' ? water.damage : -1);
+        castSpell(b, spellEffect('森', 'success', 12), 'success');
+        expect(e.stopMs).toBeGreaterThan(0);
+        expect(spellTips(b, 'water').some(t => !t.good)).toBe(true);
+    });
+
+    it('ふたご: the カバ hurts it well; the fire burns it, and a burnt one does not part', () => {
+        expect(firstHit('twin', 'kaba').harm).toBeGreaterThan(firstHit('twin', 'pengin').harm * 2);
+        const { b, e } = sendOne('twin');
+        e.x = 400;
+        e.speed = 0;
+        e.hp = e.maxHp = 5000;
+        expect(spellTips(b, 'fire').map(t => t.good)).toEqual([true]);
+        castSpell(b, spellEffect('火', 'success', 4), 'success');
+        expect(e.burnMs).toBe(BURN_MS);
+        e.hp = 0;
+        step(b, DT);
+        expect(b.fighters.filter(f => f.kind === SPLIT_INTO)).toHaveLength(0);
+        // Burnt long ago: it parts
+        const again = sendOne('twin');
+        again.e.hp = again.e.maxHp = 5000;
+        again.e.speed = 0;
+        castSpell(again.b, spellEffect('火', 'success', 4), 'success');
+        run(again.b, BURN_MS + 100);
+        again.e.hp = 0;
+        step(again.b, DT);
+        expect(again.b.fighters.filter(f => f.kind === SPLIT_INTO)).toHaveLength(ENEMIES.twin.split!);
+    });
+
+    it('ふかふか and ふたご take the ネコ\'s shots: it cannot hit the base over them', () => {
+        const b = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [] }, [{ id: 'neko', level: 1 }]);
+        b.money = 1e5;
+        summon(b, 'neko');
+        const u = b.fighters[0];
+        u.x = LANE.enemyBase + 150;
+        u.speed = 0;
+        u.wait = 0;
+        const wall = enemyAt(b, LANE.enemyBase + 60, 'twin');
+        wall.soft = { part: ENEMIES.twin.soft!, bane: 2, except: ['kaba'] };
+        wall.speed = 0;
+        wall.attack = 0;
+        step(b, DT);
+        expect(b.enemyBase.hp).toBe(1e6);
+        expect(wall.hp).toBeLessThan(wall.maxHp);
+    });
+
+    it('the ネコ aims first at a こもりうた in its reach', () => {
+        const b = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [] }, [{ id: 'neko', level: 1 }]);
+        b.money = 1e5;
+        summon(b, 'neko');
+        const u = b.fighters[0];
+        u.x = 600;
+        u.speed = 0;
+        u.wait = 0;
+        const front = enemyAt(b, 560, 'hard'), singer = enemyAt(b, 420, 'singer');
+        singer.heal = { ...ENEMIES.singer.heal! };
+        front.speed = singer.speed = 0;
+        step(b, DT);
+        expect(singer.hp).toBeLessThan(singer.maxHp);
+        expect(front.hp).toBe(front.maxHp);
+    });
+
+    it('a こもりうた stopped by the wood does not sing', () => {
+        const { b, e } = sendOne('singer');
+        e.x = 300;
+        e.speed = 0;
+        const near = enemyAt(b, 380, 'hard');
+        near.speed = 0;
+        near.hp = 100;
+        expect(spellTips(b, 'wood').map(t => t.good)).toEqual([true]);
+        e.stopMs = ENEMIES.singer.heal!.everyMs * 2;
+        run(b, ENEMIES.singer.heal!.everyMs + 100);
+        expect(near.hp).toBe(100);
+    });
+
+    it('めざまし and ゆめのまおう startle the ones they hit: they stop a while', () => {
+        expect(ENEMIES.bell.stun).toBeGreaterThan(0);
+        expect(ENEMIES.king.stun).toBeGreaterThan(0);
+        const { b, e } = sendOne('bell', [{ id: 'purun', level: 1 }]);
+        b.money = 1e5;
+        e.x = 400;
+        e.speed = 0;
+        e.wait = 0;
+        summon(b, 'purun');
+        const u = b.fighters.find(f => f.side === 'ally')!;
+        u.speed = 0;
+        u.x = 400 + (u.size + e.size) / 2 + 10;
+        step(b, DT);
+        expect(u.stopMs).toBeGreaterThan(ENEMIES.bell.stun! - 100);
+        expect(u.startled).toBe(true);
+    });
+
+    it('from the 11th the enemies have tips, and the units good against them are taken from the deck', () => {
+        for (const id of ['bell', 'fluffy', 'twin', 'singer', 'king'] as const) {
+            expect(ENEMIES[id].tip, id).toBeTruthy();
+            expect(ENEMIES[id].counters?.length, id).toBeGreaterThan(0);
+        }
+        for (const id of ['zako', 'hard', 'fast', 'thrower', 'boss'] as const) expect(ENEMIES[id].tip, id).toBeUndefined();
+    });
+});
+
+describe('the big waves', () => {
+    const waveStage: Stage = { ...quiet, waves: [{ at: 20, enemies: [{ enemy: 'zako', count: 3 }, { enemy: 'fast', element: 'fire', count: 2 }] }] };
+
+    it('come from the 11th stage on, never before', () => {
+        for (const s of STAGES) expect((s.waves?.length ?? 0) > 0, `stage ${s.id}`).toBe(s.id >= 11);
+    });
+
+    it('are told WAVE.warnMs before, then come out one after another', () => {
+        const b = createBattle(waveStage, []);
+        run(b, 20000 - WAVE.warnMs - 500);
+        expect(waveSoon(b)).toBeNull();
+        run(b, 1000);
+        expect(waveSoon(b)?.index).toBe(0);
+        run(b, WAVE.warnMs - 500 + DT);
+        expect(b.fighters).toHaveLength(1);
+        run(b, WAVE.gapMs * 4 + DT);
+        expect(b.fighters.map(f => f.kind)).toEqual(waveEnemies(waveStage.waves![0]).map(e => e.enemy));
+        expect(waveEnemies(waveStage.waves![0]).map(e => e.enemy)).toEqual(['zako', 'fast', 'zako', 'fast', 'zako']);
+        expect(waveSoon(b)).toBeNull();
+    });
 });
 
 describe('the magic of the enemy tower', () => {
@@ -441,8 +616,9 @@ describe('the magic of the enemy tower', () => {
     it('is won without まもり too; with it, more of our base is left', () => {
         let guard = 0, none = 0;
         for (const s of STAGES.filter(st => st.enemyMagic)) {
-            const g = autoplay(s, { spell: 'success', level: levelAt(s.id) });
-            const n = autoplay(s, { spell: 'success', level: levelAt(s.id), guard: false });
+            const choose = s.id <= 10 ? 'best' : 'smart';
+            const g = autoplay(s, { spell: 'success', level: levelAt(s.id), choose });
+            const n = autoplay(s, { spell: 'success', level: levelAt(s.id), choose, guard: false });
             expect(n.result, `stage ${s.id}`).toBe('win');
             guard += g.allyBase.hp / g.allyBase.max;
             none += n.allyBase.hp / n.allyBase.max;

@@ -4,13 +4,13 @@
 // play whole stages). Our base is on the right, the enemy's on the left; our units go left.
 // What happens for the sound and the pictures is told by `events` (emptied by the screen) and `fx`.
 import {
-    BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
+    BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, SPELL_GROWS_FROM, WAVE, FIRST_CLEAR_TIMES, LANE, MANA_MAX, MANA_PER_SECOND, MANA_REFUND, PERFECT_BONUS, STAR_BASE_HP, START_MONEY, WALLET
 } from '../config';
 import type { SpellEffect, SpellGroup } from '../spell/effects';
 import { ELEMENTS, affinity, type Element } from '../spell/elements';
 import type { SpellGrade } from '../spell/grade';
 import { ELEMENT_BODY, ENEMIES, ENEMY_SPELLS, SPLIT_INTO, type EnemyId, type EnemySpell } from './enemies';
-import type { Spawn, Stage } from './stages';
+import type { Spawn, Stage, Wave } from './stages';
 import { formOf, unitStats, type UnitId } from './units';
 
 export type Side = 'ally' | 'enemy';
@@ -55,6 +55,20 @@ export interface Fighter {
     // こもりうた: heals the enemies near it; ms before it sings again
     heal?: { amount: number; everyMs: number; range: number };
     healWait?: number;
+    // ふかふか: our units other than `except` do only this part of their harm (not the spells)
+    soft?: { part: number; bane: number; except: readonly UnitId[] };
+    // Those it hits stop this long (ms)
+    stun?: number;
+    // Not pushed back, by the water spell or by a unit (ふかふか)
+    heavy?: boolean;
+    // ネコ: aims first at a こもりうた in its reach
+    snipe?: boolean;
+    // ms it burns (a ふたご hit by the fire): if it falls now, it does not part
+    burnMs?: number;
+    // Stopped by a めざまし or the ゆめのまおう (startled, not asleep: for the picture)
+    startled?: boolean;
+    // An enemy in the ふとん バリア (the enemy tower's magic): our units cannot hurt it; a spell breaks it
+    pillow?: boolean;
 }
 
 // fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
@@ -92,7 +106,7 @@ export interface Fx {
 
 const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element });
 
-export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'enemyMagic' | 'blocked';
+export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'enemyMagic' | 'blocked' | 'wave';
 
 export interface Base {
     hp: number;
@@ -128,6 +142,8 @@ export interface Battle {
     // The enemy tower's magic: how many it has cast, and when (ms of the battle) the next goes off
     enemyCasts: number;
     enemyMagicAt: number;
+    // The big waves (stages.ts waves): how many of each have come out
+    waveSpawned: number[];
     result: null | 'win' | 'lose';
     fx: Fx[];
     events: BattleEvent[];
@@ -155,6 +171,7 @@ export function createBattle(stage: Stage, deck: readonly DeckUnit[]): Battle {
         shieldAmount: 0,
         enemyCasts: 0,
         enemyMagicAt: stage.enemyMagic ? stage.enemyMagic.from * 1000 : Infinity,
+        waveSpawned: (stage.waves ?? []).map(() => 0),
         result: null,
         fx: [],
         events: [],
@@ -199,6 +216,7 @@ export function summon(b: Battle, id: UnitId) {
         speed: s.speed, knockback: s.knockback, area: s.area, wait: s.attackMs * 0.3, stopMs: 0,
         shield: b.shieldMs > 0 ? b.shieldAmount : 0, hurtMs: 0, fighting: false, money: 0, mana: 0
     });
+    if (s.snipe) b.fighters[b.fighters.length - 1].snipe = true;
     b.summoned++;
     b.events.push('summon');
     return true;
@@ -221,6 +239,9 @@ function enemyAt(b: Battle, id: EnemyId, element: Element | null, cycle: boolean
         money: e.money, mana: e.mana
     };
     if (e.split) f.split = e.split;
+    if (e.soft) f.soft = { part: e.soft, bane: e.bane ?? 1, except: e.counters ?? [] };
+    if (e.stun) f.stun = e.stun;
+    if (e.heavy) f.heavy = true;
     if (e.heal) {
         f.heal = { ...e.heal, amount: Math.round(e.heal.amount * p) };
         f.healWait = e.heal.everyMs;
@@ -277,6 +298,8 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
         b.fx.push({ kind: 'fizzle', x: middle, ms: 0, total: 900 });
         return;
     }
+    // The enemies of the later stages are stronger: the spells too
+    const grow = spellGrowth(b.stage);
     switch (effect.kind) {
         case 'attack': {
             let good = 0, weak = 0;
@@ -285,9 +308,16 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
                 const k = affinity(effect.element, f.element, 'spell');
                 if (k > 1) good++;
                 if (k < 1) weak++;
-                const dealt = effect.damage * k * resist(f);
+                const dealt = effect.damage * grow * k * resist(f);
+                // The ふとん バリア is broken at once
+                if (f.pillow) {
+                    f.pillow = false;
+                    f.shield = 0;
+                }
                 harm(f, dealt);
-                if (effect.push) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
+                // A ふたご hit by the fire burns: falling while it does, it does not part
+                if (effect.group === 'fire' && f.split) f.burnMs = BURN_MS;
+                if (effect.push && !f.heavy) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
                 if (effect.stopMs) f.stopMs = Math.max(f.stopMs, effect.stopMs * resist(f));
                 // Seen on each one (where the wave left it): a longer flinch, and the number over it
                 f.hurtMs = Math.max(f.hurtMs, SPELL_HURT_MS);
@@ -301,8 +331,8 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
         }
         case 'shield':
             b.shieldMs = effect.ms;
-            b.shieldAmount = effect.shield;
-            for (const f of allies(b)) f.shield = effect.shield;
+            b.shieldAmount = effect.shield * grow;
+            for (const f of allies(b)) f.shield = b.shieldAmount;
             break;
         case 'boost':
             b.boostMs = effect.ms;
@@ -313,6 +343,10 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
     b.fx.push({ kind: effect.group, x: middle, ms: 0, total });
     if (grade === 'perfect') b.fx.push({ kind: 'perfect', x: middle, ms: 0, total: 1500 });
 }
+
+// How much more the spells do in a stage (1 to the 10th: SPELL_GROWS_FROM); the square root, for the
+// units do not grow with the stage (a spell as strong as the enemies would win by itself)
+export const spellGrowth = (stage: Stage) => Math.sqrt(Math.max(1, stage.power / SPELL_GROWS_FROM));
 
 // How well a spell of this element would work on the enemies there now (their hp weighs):
 // the mean of the affinity. 'none': no enemy to hurt (or a spell that does not hurt)
@@ -341,6 +375,41 @@ export function enemyMagicSoon(b: Battle): { spell: EnemySpell; ms: number } | n
 // The barrier of かね (まもり) lasts: ours and our base are kept from the enemy's magic
 export const guarded = (b: Battle) => b.shieldMs > 0;
 
+// --- The big waves (stages.ts waves) ---
+// The enemies of a wave, one by one, in the order they come out (the kinds in turn)
+export function waveEnemies(wave: Wave): { enemy: EnemyId; element?: Element }[] {
+    const out: { enemy: EnemyId; element?: Element }[] = [];
+    const most = Math.max(0, ...wave.enemies.map(e => e.count));
+    for (let k = 0; k < most; k++) for (const e of wave.enemies) if (k < e.count) out.push({ enemy: e.enemy, element: e.element });
+    return out;
+}
+
+// The next wave and the ms before it comes, from WAVE.warnMs before (null: none soon)
+export function waveSoon(b: Battle): { index: number; ms: number } | null {
+    if (b.result) return null;
+    const waves = b.stage.waves ?? [];
+    const index = waves.findIndex((_, i) => b.waveSpawned[i] === 0);
+    if (index < 0) return null;
+    const ms = waves[index].at * 1000 - b.time;
+    return ms <= WAVE.warnMs ? { index, ms: Math.max(0, ms) } : null;
+}
+
+// --- What a spell of a group would do there now, more than its element (the cards say it) ---
+// good: a reason to choose it; else a reason not to. With [kanji|reading] marks
+export interface SpellTip {
+    text: string;
+    good: boolean;
+}
+
+export function spellTips(b: Battle, group: SpellGroup): SpellTip[] {
+    const list = enemies(b);
+    const tips: SpellTip[] = [];
+    if (group === 'fire' && list.some(f => f.split)) tips.push({ text: 'ふたごが わかれない！', good: true });
+    if (group === 'wood' && list.some(f => f.heal)) tips.push({ text: 'こもりうたが とまる！', good: true });
+    if (group === 'water' && list.some(f => f.heavy)) tips.push({ text: 'ふかふかは おせない', good: false });
+    return tips;
+}
+
 function enemyCast(b: Battle, spell: EnemySpell) {
     const middle = (LANE.enemyBase + LANE.allyBase) / 2;
     // Where the barrier stopped it: one ふせいだ！ over the middle of them
@@ -350,7 +419,10 @@ function enemyCast(b: Battle, spell: EnemySpell) {
         case 'sleep':
             for (const f of allies(b)) {
                 if (f.shield > 0) block(f.x);
-                else f.stopMs = Math.max(f.stopMs, ENEMY_MAGIC.sleep.ms);
+                else {
+                    f.stopMs = Math.max(f.stopMs, ENEMY_MAGIC.sleep.ms);
+                    f.startled = false;
+                }
             }
             break;
         case 'meteor':
@@ -368,7 +440,10 @@ function enemyCast(b: Battle, spell: EnemySpell) {
             break;
         case 'futon': {
             const shield = Math.round(ENEMY_MAGIC.futon.shield * b.stage.power);
-            for (const f of enemies(b)) f.shield = Math.max(f.shield, shield);
+            for (const f of enemies(b)) {
+                f.shield = Math.max(f.shield, shield);
+                f.pillow = true;
+            }
             break;
         }
     }
@@ -381,6 +456,9 @@ function enemyCast(b: Battle, spell: EnemySpell) {
         b.mana = Math.min(MANA_MAX, b.mana + ENEMY_MAGIC.blockRefund * MANA_MAX);
     }
 }
+
+// A ふたご hit by the fire spell does not part if it falls within this time
+export const BURN_MS = 8000;
 
 // --- One step of the battle ---
 function nearestFoe(b: Battle, f: Fighter) {
@@ -397,11 +475,20 @@ function nearestFoe(b: Battle, f: Fighter) {
 // The gap between the fronts of two bodies
 const gap = (f: Fighter, o: Fighter) => Math.abs(o.x - f.x) - (f.size + o.size) / 2;
 
+// The one it hits: the nearest, but a ネコ (snipe) aims first at one that heals in its reach
+function targetOf(b: Battle, f: Fighter, nearest: Fighter | null): Fighter | null {
+    if (!f.snipe || !nearest) return nearest;
+    const ahead = (o: Fighter) => (f.side === 'ally' ? o.x <= f.x : o.x >= f.x);
+    return b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.heal && ahead(o) && gap(f, o) <= f.range) ?? nearest;
+}
+
 function fight(b: Battle, f: Fighter, dt: number) {
     f.wait = Math.max(0, f.wait - dt);
     f.hurtMs = Math.max(0, f.hurtMs - dt);
+    if (f.burnMs) f.burnMs = Math.max(0, f.burnMs - dt);
     if (f.stopMs > 0) {
         f.stopMs = Math.max(0, f.stopMs - dt);
+        if (f.stopMs === 0) f.startled = false;
         f.fighting = false;
         return;
     }
@@ -412,6 +499,9 @@ function fight(b: Battle, f: Fighter, dt: number) {
     const baseX = ally ? LANE.enemyBase : LANE.allyBase;
     const toBase = Math.abs(baseX - f.x) - f.size / 2;
     const foeInReach = foe !== null && gap(f, foe) <= f.range;
+    // A ふかふか or ふたご in its reach stands in the way of what it throws: it hits that, not the base
+    const wall = foeInReach && f.range > 100 ? b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.soft && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range) : undefined;
+    const aim = wall ?? (foeInReach ? targetOf(b, f, foe) : foe);
     f.fighting = foeInReach || toBase <= f.range;
     if (!f.fighting) {
         let x = f.x + dir * f.speed * (dt / 1000);
@@ -423,23 +513,31 @@ function fight(b: Battle, f: Fighter, dt: number) {
     if (f.wait > 0) return;
     f.wait = f.attackMs;
     // Something thrown, to be seen flying (it hits at once all the same)
-    if (f.range > 100) b.fx.push({ kind: 'shot', x: f.x, to: foeInReach && foe ? foe.x : baseX, ms: 0, total: 350, who: whoOf(f) });
+    if (f.range > 100) b.fx.push({ kind: 'shot', x: f.x, to: foeInReach && aim ? aim.x : baseX, ms: 0, total: 350, who: whoOf(f) });
     const power = ally && b.boostMs > 0 ? f.attack * b.boostRate : f.attack;
     // At the base, the base first: the enemies that keep coming out of it would else hold back the
     // units that got there for ever
-    const baseInReach = toBase <= f.range;
+    const baseInReach = toBase <= f.range && !wall;
     if (foeInReach && foe && !baseInReach) {
         const hit = f.area
             ? b.fighters.filter(o => o.side !== f.side && o.hp > 0 && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range)
-            : [foe];
+            : [aim ?? foe];
         // The ground shakes where it hits (far off for one that throws)
         if (f.area) b.fx.push({ kind: 'stomp', x: f.range > 100 ? foe.x : f.x, ms: 0, total: 450, who: whoOf(f) });
         for (const o of hit) {
             const k = affinity(f.element, o.element, 'unit');
-            harm(o, power * k);
+            const soft = !o.soft ? 1 : o.soft.except.includes(f.kind as UnitId) ? o.soft.bane : o.soft.part;
+            // In the ふとん バリア: nothing gets through (only a spell breaks it)
+            if (o.pillow) continue;
+            harm(o, power * k * soft);
+            if (f.stun && o.shield <= 0 && o.stopMs < f.stun) {
+                o.stopMs = f.stun;
+                o.startled = true;
+            }
             if (k > 1) b.fx.push({ kind: 'spark', x: o.x, ms: 0, total: 300, who: whoOf(o) });
-            if (f.knockback > 0) {
-                const back = f.knockback * (o.boss ? 0.25 : 1);
+            if (f.knockback > 0 && !o.heavy) {
+                // A ふたご holds firm as it holds against the hit
+                const back = f.knockback * (o.boss ? 0.25 : 1) * Math.min(1, soft);
                 o.x = ally ? Math.max(LANE.enemyBase + o.size / 2, o.x - back) : Math.min(LANE.allyBase - o.size / 2, o.x + back);
             }
         }
@@ -477,6 +575,16 @@ export function step(b: Battle, dt: number) {
         }
     });
 
+    (b.stage.waves ?? []).forEach((wave, i) => {
+        const list = waveEnemies(wave);
+        while (b.waveSpawned[i] < list.length && b.time >= wave.at * 1000 + b.waveSpawned[i] * WAVE.gapMs) {
+            if (b.waveSpawned[i] === 0) b.events.push('wave');
+            const e = list[b.waveSpawned[i]];
+            enemyAt(b, e.enemy, e.element ?? null, false, LANE.enemyBase + ENEMIES[e.enemy].size / 2);
+            b.waveSpawned[i]++;
+        }
+    });
+
     const magic = b.stage.enemyMagic;
     if (magic && b.time >= b.enemyMagicAt) {
         enemyCast(b, magic.spells[b.enemyCasts % magic.spells.length]);
@@ -504,8 +612,9 @@ export function step(b: Battle, dt: number) {
             b.kills++;
             b.events.push('fall');
             // ふたご: two come out where it fell
-            for (let k = 0; k < (f.split ?? 0); k++) enemyAt(b, SPLIT_INTO, f.element, false, Math.max(LANE.enemyBase + 20, f.x - 22 + k * 30));
-            if (f.split) b.fx.push({ kind: 'split', x: f.x, ms: 0, total: 700, who: whoOf(f) });
+            const parts = f.burnMs ? 0 : f.split ?? 0;
+            for (let k = 0; k < parts; k++) enemyAt(b, SPLIT_INTO, f.element, false, Math.max(LANE.enemyBase + 20, f.x - 22 + k * 30));
+            if (parts) b.fx.push({ kind: 'split', x: f.x, ms: 0, total: 700, who: whoOf(f) });
         }
     }
     b.fighters = b.fighters.filter(f => f.hp > 0);

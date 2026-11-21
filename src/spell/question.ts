@@ -4,6 +4,7 @@
 import { kanjiDatabase, type KanjiItem } from '../vendor/kanji-quiz/src/data/kanji';
 import { reibunList, type Reibun } from '../vendor/kanji-quiz/src/data/reibun';
 import type { SpellGroup } from './effects';
+import type { SpellTip } from '../game/battle';
 
 export interface Question {
     item: KanjiItem;
@@ -21,6 +22,8 @@ export interface Choice {
     guard?: boolean;
     // How well it would work on the enemies there now (game/battle.ts spellRating)
     rating: 'good' | 'normal' | 'weak' | 'none';
+    // What it would do there now more than its element (game/battle.ts spellTips)
+    tips?: SpellTip[];
 }
 
 // The kanji asked last are left out (the list is changed: the new kanji goes in it)

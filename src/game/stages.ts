@@ -6,6 +6,10 @@
 // makes the battle much easier ('cycle': the last boss changes it every BOSS_ELEMENT_MS).
 // From the 6th stage the enemy tower casts magic too (enemyMagic: enemies.ts ENEMY_SPELLS); those
 // stages were made a little weaker for it, so that a player who never guards still wins.
+// From the 11th the enemies have weak points (enemies.ts tip, counters) and big waves come (waves):
+// the way that wins the first 10 (the elements only) does not win there even 2 levels up, a player
+// who reads the tips does, and still needs the magic (tests/battle.test.ts with autoplay 'smart').
+// Their numbers were chosen so that this holds with the power ±6% too.
 import type { Element } from '../spell/elements';
 import type { EnemyId, EnemySpell } from './enemies';
 
@@ -24,6 +28,13 @@ export interface EnemyMagic {
     spells: readonly EnemySpell[];
 }
 
+// A big wave (from the 11th stage): told WAVE.warnMs before `at` seconds, then all of these come
+// out one after another (config.ts WAVE.gapMs apart)
+export interface Wave {
+    at: number;
+    enemies: readonly { enemy: EnemyId; element?: Element; count: number }[];
+}
+
 export interface Stage {
     id: number;
     name: string;
@@ -40,6 +51,8 @@ export interface Stage {
     boss?: boolean;
     // From the 6th stage
     enemyMagic?: EnemyMagic;
+    // From the 11th stage
+    waves?: readonly Wave[];
 }
 
 export const STAGES: readonly Stage[] = [
@@ -86,50 +99,60 @@ export const STAGES: readonly Stage[] = [
             { enemy: 'boss', element: 'cycle', from: 50, every: 1, count: 1 }, { enemy: 'thrower', element: 'water', from: 60, every: 24 }, { enemy: 'boss', element: 'cycle', from: 150, every: 1, count: 1 }
         ]
     },
-    // --- From the 11th: the new enemies, one by one, then all together ---
+    // --- From the 11th: the new enemies, one by one, then all together; the big waves ---
     {
-        id: 11, name: 'りんりん [時計台|とけいだい]', power: 4.23, enemyBaseHp: 11000, allyBaseHp: 3200, reward: 65, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'meteor'] },
-        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'bell', element: 'fire', from: 15, every: 18 }, { enemy: 'fast', element: 'wood', from: 30, every: 16 }]
+        id: 11, name: 'りんりん [時計台|とけいだい]', power: 6.35, enemyBaseHp: 16000, allyBaseHp: 3200, reward: 65, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'meteor'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'bell', element: 'fire', count: 2 }, { enemy: 'zako', element: 'water', count: 5 }] }, { at: 140, enemies: [{ enemy: 'bell', element: 'fire', count: 3 }, { enemy: 'fast', element: 'wood', count: 4 }] }],
+        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'bell', element: 'fire', from: 15, every: 13 }, { enemy: 'fast', element: 'wood', from: 30, every: 16 }]
     },
     {
-        id: 12, name: 'ふかふか [雲|くも]の [道|みち]', power: 4.42, enemyBaseHp: 11500, allyBaseHp: 3200, reward: 70, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'sleep'] },
-        spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 6 }, { enemy: 'fluffy', element: 'fire', from: 20, every: 28 }, { enemy: 'thrower', element: 'wood', from: 30, every: 20 }]
+        id: 12, name: 'ふかふか [雲|くも]の [道|みち]', power: 6.5, enemyBaseHp: 9000, allyBaseHp: 4400, reward: 70, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'futon', 'sleep'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'fluffy', element: 'fire', count: 2 }, { enemy: 'zako', element: 'fire', count: 6 }] }, { at: 140, enemies: [{ enemy: 'fluffy', element: 'fire', count: 3 }, { enemy: 'zako', element: 'fire', count: 4 }, { enemy: 'fast', element: 'wood', count: 3 }] }],
+        spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 6 }, { enemy: 'fluffy', element: 'fire', from: 20, every: 28 }, { enemy: 'fast', element: 'wood', from: 30, every: 16 }]
     },
     {
-        id: 13, name: 'ふたごの [沼|ぬま]', power: 4.8, enemyBaseHp: 12000, allyBaseHp: 3400, reward: 75, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'meteor'] },
-        spawns: [{ enemy: 'zako', element: 'wood', from: 3, every: 7 }, { enemy: 'twin', element: 'wood', from: 6, every: 13 }, { enemy: 'hard', element: 'water', from: 40, every: 30 }]
+        id: 13, name: 'ふたごの [沼|ぬま]', power: 4.04, enemyBaseHp: 8000, allyBaseHp: 3400, reward: 75, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'futon', 'meteor'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'twin', count: 4 }] }, { at: 140, enemies: [{ enemy: 'twin', count: 5 }, { enemy: 'hard', element: 'wood', count: 1 }] }],
+        spawns: [{ enemy: 'zako', from: 3, every: 7 }, { enemy: 'twin', from: 6, every: 13 }, { enemy: 'hard', element: 'wood', from: 40, every: 30 }, { enemy: 'fast', element: 'wood', from: 25, every: 18 }]
     },
     {
-        id: 14, name: 'こもりうたの [湖|みずうみ]', power: 5.52, enemyBaseHp: 12000, allyBaseHp: 3400, reward: 80, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'sleep'] },
-        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'singer', element: 'water', from: 20, every: 25 }, { enemy: 'hard', element: 'water', from: 30, every: 28 }, { enemy: 'fast', element: 'fire', from: 45, every: 18 }]
+        id: 14, name: 'こもりうたの [湖|みずうみ]', power: 8.28, enemyBaseHp: 12000, allyBaseHp: 3400, reward: 80, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'sleep', 'futon'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'singer', element: 'wood', count: 2 }, { enemy: 'hard', element: 'water', count: 2 }] }, { at: 140, enemies: [{ enemy: 'singer', element: 'wood', count: 2 }, { enemy: 'fast', element: 'fire', count: 4 }] }],
+        spawns: [{ enemy: 'zako', element: 'water', from: 2, every: 6 }, { enemy: 'singer', element: 'wood', from: 20, every: 25 }, { enemy: 'hard', element: 'water', from: 30, every: 28 }, { enemy: 'fast', element: 'fire', from: 45, every: 18 }]
     },
     {
-        id: 15, name: 'ゆめのまおうの [塔|とう]', power: 2.88, enemyBaseHp: 12000, allyBaseHp: 3600, reward: 130, boss: true, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'futon', 'meteor'] },
+        id: 15, name: 'ゆめのまおうの [塔|とう]', power: 4.18, enemyBaseHp: 12000, allyBaseHp: 3600, reward: 130, boss: true, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'futon', 'meteor'] },
+        waves: [{ at: 100, enemies: [{ enemy: 'bell', element: 'water', count: 2 }, { enemy: 'zako', element: 'fire', count: 5 }] }, { at: 170, enemies: [{ enemy: 'singer', element: 'fire', count: 2 }, { enemy: 'bell', element: 'water', count: 2 }] }],
         spawns: [{ enemy: 'zako', element: 'fire', from: 2, every: 4 }, { enemy: 'bell', element: 'water', from: 20, every: 18 }, { enemy: 'king', element: 'wood', from: 50, every: 1, count: 1 }, { enemy: 'singer', element: 'fire', from: 70, every: 30 }]
     },
     {
-        id: 16, name: '[真夜中|まよなか]の [町|まち]', power: 6.62, enemyBaseHp: 13000, allyBaseHp: 3600, reward: 85, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'futon', 'sleep'] },
-        spawns: [{ enemy: 'fast', element: 'water', from: 3, every: 6 }, { enemy: 'twin', element: 'water', from: 15, every: 14 }, { enemy: 'thrower', element: 'water', from: 25, every: 20 }, { enemy: 'fluffy', element: 'fire', from: 35, every: 30 }]
+        id: 16, name: '[真夜中|まよなか]の [町|まち]', power: 4.77, enemyBaseHp: 16000, allyBaseHp: 3600, reward: 85, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'futon', 'sleep'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'twin', count: 3 }, { enemy: 'fast', element: 'wood', count: 4 }] }, { at: 140, enemies: [{ enemy: 'fluffy', count: 2 }, { enemy: 'twin', count: 3 }] }],
+        spawns: [{ enemy: 'fast', element: 'wood', from: 3, every: 6 }, { enemy: 'twin', from: 15, every: 14 }, { enemy: 'thrower', element: 'wood', from: 25, every: 20 }, { enemy: 'fluffy', from: 35, every: 30 }]
     },
     {
-        id: 17, name: '[星降|ほしふ]る [丘|おか]', power: 3.59, enemyBaseHp: 13500, allyBaseHp: 3800, reward: 90, enemyMagic: { from: 45, every: 50, spells: ['futon', 'sleep', 'meteor'] },
+        id: 17, name: '[星降|ほしふ]る [丘|おか]', power: 3.97, enemyBaseHp: 13500, allyBaseHp: 3800, reward: 90, enemyMagic: { from: 45, every: 50, spells: ['futon', 'sleep', 'meteor'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'bell', element: 'fire', count: 3 }, { enemy: 'zako', element: 'wood', count: 4 }] }, { at: 140, enemies: [{ enemy: 'singer', element: 'water', count: 2 }, { enemy: 'hard', element: 'fire', count: 2 }] }],
         spawns: [{ enemy: 'zako', element: 'wood', from: 2, every: 5 }, { enemy: 'bell', element: 'fire', from: 12, every: 16 }, { enemy: 'singer', element: 'water', from: 30, every: 26 }, { enemy: 'hard', element: 'fire', from: 40, every: 28 }]
     },
     {
-        id: 18, name: '[眠|ねむ]りの [海|うみ]', power: 5.33, enemyBaseHp: 14000, allyBaseHp: 3800, reward: 95, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'meteor', 'futon'] },
-        spawns: [{ enemy: 'fast', element: 'fire', from: 3, every: 6 }, { enemy: 'fluffy', element: 'water', from: 15, every: 26 }, { enemy: 'twin', element: 'wood', from: 25, every: 15 }, { enemy: 'singer', element: 'water', from: 40, every: 28 }]
+        id: 18, name: '[眠|ねむ]りの [海|うみ]', power: 3.84, enemyBaseHp: 14000, allyBaseHp: 3800, reward: 95, enemyMagic: { from: 45, every: 50, spells: ['sleep', 'meteor', 'futon'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'fluffy', element: 'water', count: 2 }, { enemy: 'twin', element: 'wood', count: 2 }] }, { at: 140, enemies: [{ enemy: 'singer', element: 'wood', count: 2 }, { enemy: 'fast', element: 'wood', count: 5 }] }],
+        spawns: [{ enemy: 'fast', element: 'wood', from: 3, every: 6 }, { enemy: 'fluffy', element: 'water', from: 15, every: 26 }, { enemy: 'twin', element: 'wood', from: 25, every: 22 }, { enemy: 'singer', element: 'wood', from: 40, every: 28 }]
     },
     {
-        id: 19, name: 'わすれ[山脈|さんみゃく]', power: 5.28, enemyBaseHp: 14500, allyBaseHp: 4000, reward: 100, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'sleep', 'futon'] },
+        id: 19, name: 'わすれ[山脈|さんみゃく]', power: 5.18, enemyBaseHp: 14500, allyBaseHp: 4600, reward: 100, enemyMagic: { from: 45, every: 50, spells: ['meteor', 'sleep', 'futon'] },
+        waves: [{ at: 70, enemies: [{ enemy: 'bell', element: 'wood', count: 2 }, { enemy: 'twin', element: 'wood', count: 3 }] }, { at: 140, enemies: [{ enemy: 'fluffy', element: 'fire', count: 2 }, { enemy: 'singer', element: 'wood', count: 2 }] }, { at: 210, enemies: [{ enemy: 'bell', element: 'wood', count: 2 }, { enemy: 'twin', element: 'wood', count: 3 }, { enemy: 'singer', element: 'wood', count: 1 }] }],
         spawns: [
-            { enemy: 'zako', element: 'fire', from: 2, every: 5 }, { enemy: 'bell', element: 'water', from: 12, every: 18 }, { enemy: 'twin', element: 'wood', from: 20, every: 16 },
+            { enemy: 'zako', element: 'fire', from: 2, every: 5 }, { enemy: 'bell', element: 'wood', from: 12, every: 18 }, { enemy: 'twin', element: 'wood', from: 20, every: 16 },
             { enemy: 'fluffy', element: 'fire', from: 35, every: 30 }, { enemy: 'singer', element: 'wood', from: 45, every: 30 }
         ]
     },
     {
-        id: 20, name: '[夢|ゆめ]の [果|は]て', power: 3.5, enemyBaseHp: 15000, allyBaseHp: 4200, reward: 200, boss: true, enemyMagic: { from: 45, every: 50, spells: ['futon', 'meteor', 'sleep'] },
+        id: 20, name: '[夢|ゆめ]の [果|は]て', power: 3.43, enemyBaseHp: 15000, allyBaseHp: 4200, reward: 200, boss: true, enemyMagic: { from: 45, every: 50, spells: ['futon', 'meteor', 'sleep'] },
+        waves: [{ at: 100, enemies: [{ enemy: 'twin', element: 'fire', count: 2 }, { enemy: 'bell', element: 'wood', count: 2 }] }, { at: 200, enemies: [{ enemy: 'singer', element: 'water', count: 2 }, { enemy: 'twin', element: 'fire', count: 2 }] }],
         spawns: [
-            { enemy: 'zako', element: 'water', from: 2, every: 7 }, { enemy: 'twin', element: 'fire', from: 15, every: 18 }, { enemy: 'bell', element: 'wood', from: 25, every: 24 },
+            { enemy: 'zako', element: 'water', from: 2, every: 7 }, { enemy: 'twin', element: 'fire', from: 15, every: 26 }, { enemy: 'bell', element: 'wood', from: 25, every: 24 },
             { enemy: 'king', element: 'cycle', from: 50, every: 1, count: 1 }, { enemy: 'singer', element: 'water', from: 70, every: 30 }, { enemy: 'boss', element: 'cycle', from: 150, every: 1, count: 1 }
         ]
     }
@@ -139,7 +162,7 @@ export const STAGES: readonly Stage[] = [
 export function stageEnemies(stage: Stage): { enemy: EnemyId; element: Element | 'cycle' | null }[] {
     const seen = new Set<string>();
     const out: { enemy: EnemyId; element: Element | 'cycle' | null }[] = [];
-    for (const r of stage.spawns) {
+    for (const r of [...stage.spawns, ...(stage.waves ?? []).flatMap(w => w.enemies)]) {
         const key = `${r.enemy}:${r.element ?? ''}`;
         if (seen.has(key)) continue;
         seen.add(key);

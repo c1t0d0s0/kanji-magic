@@ -143,7 +143,13 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         ctx.fill();
         ctx.stroke();
     }
-    if (f.stopMs > 0 && f.side === 'ally') {
+    if (f.stopMs > 0 && f.startled) {
+        // Startled by a めざまし or the ゆめのまおう: stars going round the head
+        for (let k = 0; k < 3; k++) {
+            const a = time / 180 + (k * Math.PI * 2) / 3;
+            star(ctx, f.x + Math.cos(a) * r * 0.7, y - r - 4 * look.boost + Math.sin(a) * 4 * look.boost, 5 * look.boost, '#ffd84a', a);
+        }
+    } else if (f.stopMs > 0 && f.side === 'ally') {
         // Ours asleep (ねむりの きり): Zzz going up
         for (let k = 0; k < 3; k++) {
             const up = ((time / 700 + k / 3) % 1);
@@ -163,6 +169,19 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         for (let k = 0; k < 3; k++) {
             ctx.beginPath();
             ctx.ellipse(f.x - r + k * r, y - r * 0.2 + k * 6, 5, 3, 0.6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+    if (f.burnMs) {
+        // A ふたご burning (the fire spell): it will not part if it falls now
+        for (let k = 0; k < 3; k++) {
+            const flick = Math.sin(time / 90 + k * 2.1 + f.id);
+            const fx = f.x + (k - 1) * r * 0.55, fy = y + r * 0.3;
+            const h = (10 + flick * 3) * look.boost;
+            ctx.fillStyle = k === 1 ? 'rgb(255 120 40 / 0.85)' : 'rgb(255 190 60 / 0.8)';
+            ctx.beginPath();
+            ctx.moveTo(fx - 4 * look.boost, fy);
+            ctx.quadraticCurveTo(fx, fy - h * 1.6, fx + 4 * look.boost, fy);
             ctx.fill();
         }
     }

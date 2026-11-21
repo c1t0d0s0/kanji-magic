@@ -3,7 +3,9 @@
 // A card shows the element and what the kanji reads in its phrase (never the kanji: that is the
 // answer), and how well it would work on the enemies there now. All in kana, as in the magic
 // circle. The time runs out after CHOICE_SECONDS: the best card is taken. While the enemy's magic
-// is coming a 4th card is まもり: its kanji (any) puts up the barrier that stops it.
+// is coming a 4th card is まもり: its kanji (any) puts up the barrier that stops it. A card may say
+// one thing more it would do there now (game/battle.ts spellTips: ふたごが わかれない！), the
+// child reads it to choose (the time running out still takes ◎ first).
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { CHOICE_SECONDS } from '../config';
 import { kana } from '../learning/furi';
@@ -48,7 +50,8 @@ const cards = computed(() => props.choices.map(c => {
         phrase: c.question ? `${c.question.reibun.before}□${c.question.reibun.after}` : '',
         rating: support ? null : RATING[c.rating],
         ratingKind: support ? 'support' : c.rating,
-        support
+        support,
+        tip: c.guard ? null : c.tips?.[0] ? { text: kana(c.tips[0].text), good: c.tips[0].good } : null
     };
 }));
 
@@ -113,6 +116,7 @@ onBeforeUnmount(() => {
                             <template v-if="c.rating"><b v-if="c.rating.mark">{{ c.rating.mark }}</b><span>{{ c.rating.text }}</span></template>
                             <span v-else class="card-support">{{ c.support }}</span>
                         </span>
+                        <span v-if="c.tip" class="card-tip" :class="{ 'is-bad': !c.tip.good }">{{ c.tip.good ? '★' : '✕' }} {{ c.tip.text }}</span>
                     </button>
                 </li>
             </ul>
@@ -283,6 +287,23 @@ h2 {
 
 .card-support {
     white-space: normal;
+}
+
+/* One thing more it would do there now */
+.card-tip {
+    justify-self: stretch;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.4rem;
+    background: #fff1c2;
+    color: #8a4b00;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.card-tip.is-bad {
+    background: #eceaf2;
+    color: var(--muted);
 }
 
 .choice-hint {

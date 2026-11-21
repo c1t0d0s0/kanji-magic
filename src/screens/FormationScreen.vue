@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // --- 編成: up to DECK_SIZE units to take into the battle, and making them stronger with どんぐり ---
 // The enemies of the stage are shown with their elements, and each unit says whether its element
-// is good against them (とくい) or not (にがて).
+// is good against them (とくい) or not (にがて). From the 11th stage the enemies have weak points
+// (enemies.ts tip, counters): told under them, and on the units good against them; and a stage with
+// big waves says so.
 import Furi from '../components/Furi.vue';
 import { computed } from 'vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
@@ -9,6 +11,7 @@ import ElementMark from '../components/ElementMark.vue';
 import { BEATS, ELEMENTS, type Element } from '../spell/elements';
 import { EVOLVE_AT, MAX_LEVEL, upgradeCost } from '../config';
 import { stageById, stageEnemies } from '../game/stages';
+import { ENEMIES, type EnemyId } from '../game/enemies';
 import { UNIT_IDS, UNITS, formOf, unitStats, type UnitId } from '../game/units';
 import { DECK_SIZE } from '../storage';
 import { availableUnits, canUpgradeUnit, fillDeck, go, save, toggleDeck, ui, upgradeUnit } from '../store';
@@ -24,11 +27,16 @@ function fit(e: Element): 'good' | 'bad' | null {
     if ([...foeElements.value].some(f => BEATS[f] === e)) return 'bad';
     return null;
 }
+// The kinds of enemies with a weak point, once each
+// (their names short, without わすれ)
+const tips = computed(() => [...new Set(foes.value.map(f => f.enemy))].filter(id => ENEMIES[id].tip).map(id => ({ id, name: ENEMIES[id].name.replace(/わすれ$/, ''), tip: ENEMIES[id].tip! })));
+// The enemies of the stage this unit is good against
+const strongOn = (id: UnitId) => tips.value.filter(t => ENEMIES[t.id as EnemyId].counters?.includes(id)).map(t => t.name);
 const units = computed(() => UNIT_IDS.map(id => {
     const level = save.units[id];
     const s = unitStats(id, level);
     const nextForm = level < MAX_LEVEL ? formOf(level + 1) !== formOf(level) : false;
-    return { id, level, s, open: availableUnits().includes(id), inDeck: save.deck.includes(id), nextForm, fit: fit(UNITS[id].element) };
+    return { id, level, s, open: availableUnits().includes(id), inDeck: save.deck.includes(id), nextForm, fit: fit(UNITS[id].element), strong: strongOn(id) };
 }));
 
 function upgrade(id: UnitId) {
@@ -58,6 +66,10 @@ function start() {
                     <ElementMark v-if="f.element" :mark="f.element" :size="18" />
                 </span>
             </div>
+            <ul v-if="tips.length" class="foe-tips">
+                <li v-for="t in tips" :key="t.id"><CharacterIcon :kind="t.id" :size="28" /><span><b>{{ t.name }}</b>：<Furi :text="t.tip" /></span></li>
+            </ul>
+            <p v-if="stage.waves?.length" class="waves"><Furi text="⚠ [大群|たいぐん]が くる ステージ。[魔法|まほう]を ためて [使|つか]おう" /></p>
             <p class="affinity">
                 <ElementMark mark="water" :size="22" /> → <ElementMark mark="fire" :size="22" /> → <ElementMark mark="wood" :size="22" /> → <ElementMark mark="water" :size="22" />
                 <small><Furi text="やじるしの [先|さき]に [強|つよ]いよ" /></small>
@@ -87,7 +99,8 @@ function start() {
                         </button>
                         <span v-else><Furi text="[最大|さいだい]！" /></span>
                     </div>
-                    <p v-if="u.fit" class="fit" :class="u.fit"><Furi :text="u.fit === 'good' ? '◎ この ステージが [得意|とくい]' : '△ この ステージは [苦手|にがて]'" /></p>
+                    <p v-if="u.strong.length" class="fit good strong"><Furi :text="`◎ ${u.strong.join('・')}に つよい${u.fit === 'bad' ? '（[属性|ぞくせい]は [苦手|にがて]）' : ''}`" /></p>
+                    <p v-else-if="u.fit" class="fit" :class="u.fit"><Furi :text="u.fit === 'good' ? '◎ この ステージが [得意|とくい]' : '△ この ステージは [苦手|にがて]'" /></p>
                 </template>
                 <template v-else>
                     <span class="unit-look" aria-hidden="true">？</span>
@@ -165,6 +178,36 @@ function start() {
     align-items: center;
 }
 
+/* From the 11th stage: how to beat each enemy, and the big waves */
+.foe-tips {
+    display: grid;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    text-align: start;
+}
+
+.foe-tips li {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.foe-tips :deep(canvas),
+.foe-tips > li > :first-child {
+    flex: none;
+}
+
+.waves {
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #b5400f;
+}
+
 .affinity {
     display: flex;
     flex-wrap: wrap;
@@ -182,6 +225,11 @@ function start() {
 
 .fit.good {
     color: #c2410c;
+}
+
+/* Good against the enemies of the stage: maybe a few names, smaller to stay on one line */
+.fit.strong {
+    font-size: 0.85rem;
 }
 
 .fit.bad {

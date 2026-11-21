@@ -2,7 +2,7 @@
 
 小学1〜6年生向けの、横スクロールの拠点攻防ゲームです。出された漢字を手書きすると、魔法陣が発動して必殺技が出ます。要件は [requirements.md](requirements.md) にあります。
 
-要件の Phase 1〜6 をひととおり作ってあります（バトル・20ステージ・敵10種・敵の魔法とまもりの魔法・ユニットの進化・魔法陣・魔法書・設定・効果音・クレジット）。数値の調整は、実際に遊んでもらいながら `src/config.ts` と `src/game/stages.ts` で行います。
+要件の Phase 1〜6 をひととおり作ってあります（バトル・20ステージ・敵10種・敵の魔法とまもりの魔法・ステージ11からの敵の弱点と大群・ユニットの進化・魔法陣・魔法書・設定・効果音・クレジット）。数値の調整は、実際に遊んでもらいながら `src/config.ts` と `src/game/stages.ts` で行います。
 
 ## 動かしかた
 
@@ -11,7 +11,7 @@ Node.js 20.19 以上（推奨 24）
 ```sh
 npm install
 npm run dev      # 開発サーバー。/practice.html が手書きの練習ページ（?debug で判定の数値も出る）
-npm test         # Vitest（流用した kanji-quiz のテストも走る。ステージを自動で遊ぶテストもある）
+npm test         # Vitest（流用した kanji-quiz のテストも走る。ステージを自動で遊ぶテストもある：ステージ11からは工夫しないと勝てないことも確かめる）
 npm run build    # vue-tsc --noEmit と vite build。dist/ に静的ファイルを出力する
 npm run radicals # KanjiVG から src/spell/radicals.ts（部首のデータ）を作り直す
 ```

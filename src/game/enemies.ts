@@ -1,5 +1,6 @@
 // --- The enemies: わすれんぼう and its kin (requirements 5.3), sleepy things in nightcaps ---
 // that forget; the pictures are in src/art/characters.ts.
+import type { UnitId } from './units';
 // Numbers of a stage of power 1; stages.ts says how strong they are in each stage.
 export type EnemyId = 'zako' | 'hard' | 'fast' | 'thrower' | 'boss' | 'bell' | 'fluffy' | 'twin' | 'singer' | 'king';
 
@@ -27,6 +28,17 @@ export interface EnemyType {
     split?: number;
     // Heals the enemies near it (and itself) this much (of a stage of power 1) every `everyMs` (こもりうた)
     heal?: { amount: number; everyMs: number; range: number };
+    // ふかふか, ふたご: our units other than `counters` do only this part of their harm, and the
+    // `counters` this many times (not the spells)
+    soft?: number;
+    bane?: number;
+    // Those of ours it hits stop this long (ms), startled (めざまし, ゆめのまおう)
+    stun?: number;
+    // Not pushed back, by the water spell or by a unit (heavy)
+    heavy?: boolean;
+    // How to beat it, for the child (with [kanji|reading] marks), and the units good against it
+    tip?: string;
+    counters?: readonly UnitId[];
 }
 
 export const ENEMIES: Record<EnemyId, EnemyType> = {
@@ -36,15 +48,20 @@ export const ENEMIES: Record<EnemyId, EnemyType> = {
     thrower: { id: 'thrower', name: 'ぽいぽいわすれ', color: '#9bb6c9', hp: 120, attack: 18, attackMs: 1800, range: 200, speed: 24, size: 34, money: 35, mana: 8, boss: false },
     boss: { id: 'boss', name: 'おおわすれんぼう', color: '#7a2c4d', hp: 3200, attack: 60, attackMs: 2400, range: 60, speed: 12, size: 72, money: 300, mana: 40, boss: true },
     // From the 11th stage: an alarm clock that rings and hits all that are near
-    bell: { id: 'bell', name: 'めざましわすれ', color: '#f2c14e', hp: 260, attack: 16, attackMs: 2000, range: 40, speed: 22, size: 38, money: 40, mana: 8, boss: false, area: true },
+    bell: { id: 'bell', name: 'めざましわすれ', color: '#f2c14e', hp: 260, attack: 24, attackMs: 2000, range: 40, speed: 22, size: 38, money: 40, mana: 8, boss: false, area: true, stun: 1200,
+        tip: 'ジリリで [味方|みかた]が [止|と]まる。ネコで [遠|とお]くから', counters: ['neko'] },
     // Soft as a futon: hard to hurt, and bounces ours back
-    fluffy: { id: 'fluffy', name: 'ふかふかわすれ', color: '#f4f1ea', hp: 700, attack: 8, attackMs: 1500, range: 30, speed: 16, size: 46, money: 50, mana: 10, boss: false, knockback: 45 },
+    fluffy: { id: 'fluffy', name: 'ふかふかわすれ', color: '#f4f1ea', hp: 700, attack: 8, attackMs: 1500, range: 30, speed: 16, size: 46, money: 50, mana: 10, boss: false, knockback: 45, soft: 0.1, bane: 2, heavy: true,
+        tip: 'カバしか よく きかない。[水|みず]で おせない', counters: ['kaba'] },
     // Two in one: falls into two わすれんぼう
-    twin: { id: 'twin', name: 'ふたごわすれ', color: '#c9a7e8', hp: 220, attack: 12, attackMs: 1300, range: 26, speed: 26, size: 40, money: 30, mana: 6, boss: false, split: 2 },
+    twin: { id: 'twin', name: 'ふたごわすれ', color: '#c9a7e8', hp: 220, attack: 20, attackMs: 1300, range: 26, speed: 26, size: 40, money: 30, mana: 6, boss: false, split: 2, soft: 0.15, bane: 2,
+        tip: 'カバが よく きく。[炎|ほのお]で もやすと わかれない', counters: ['kaba'] },
     // Sings a lullaby that heals the enemies near it; weak itself
-    singer: { id: 'singer', name: 'こもりうたわすれ', color: '#ffb3c6', hp: 150, attack: 6, attackMs: 1600, range: 150, speed: 20, size: 34, money: 45, mana: 10, boss: false, heal: { amount: 30, everyMs: 3000, range: 160 } },
+    singer: { id: 'singer', name: 'こもりうたわすれ', color: '#ffb3c6', hp: 100, attack: 6, attackMs: 1600, range: 150, speed: 20, size: 34, money: 45, mana: 10, boss: false, heal: { amount: 50, everyMs: 3000, range: 160 },
+        tip: 'ネコが ねらう。[木|き]で とめると うたえない', counters: ['neko'] },
     // The king of dreams: throws dream clouds far, on all of ours there
-    king: { id: 'king', name: 'ゆめのまおう', color: '#8e7cc3', hp: 3600, attack: 28, attackMs: 2600, range: 170, speed: 10, size: 76, money: 350, mana: 45, boss: true, area: true }
+    king: { id: 'king', name: 'ゆめのまおう', color: '#8e7cc3', hp: 3600, attack: 36, attackMs: 2600, range: 170, speed: 10, size: 76, money: 350, mana: 45, boss: true, area: true, stun: 1500,
+        tip: '[味方|みかた]が [止|と]まる。ネコなら とどかない', counters: ['neko'] }
 };
 
 // The enemies that come out of a ふたご (the first kind)

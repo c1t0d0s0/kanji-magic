@@ -20,7 +20,7 @@ import MuteButton from '../components/MuteButton.vue';
 import CharacterIcon from '../components/CharacterIcon.vue';
 import { LANE, MANA_MAX, SPELL_SLOW, WALLET } from '../config';
 import {
-    canSummon, canUpgradeWallet, castSpell, spellRating, createBattle, enemyMagicSoon, guarded, manaFull, starsOf, startSpell, step, summon, upgradeWallet,
+    canSummon, canUpgradeWallet, castSpell, spellRating, spellTips, waveSoon, createBattle, enemyMagicSoon, guarded, manaFull, starsOf, startSpell, step, summon, upgradeWallet,
     walletOf, type BattleEvent
 } from '../game/battle';
 import { ENEMY_SPELLS, type EnemySpell } from '../game/enemies';
@@ -79,7 +79,9 @@ const hud = reactive({
     cooldown: {} as Partial<Record<UnitId, number>>,
     result: null as null | 'win' | 'lose',
     // The enemy's magic told now, and the seconds before it goes off
-    warn: null as null | { spell: EnemySpell; seconds: number; blockable: boolean; guarded: boolean }
+    warn: null as null | { spell: EnemySpell; seconds: number; blockable: boolean; guarded: boolean },
+    // A big wave told now: the seconds before it comes
+    wave: null as null | { seconds: number }
 });
 
 // --- The tutorial ---
@@ -140,7 +142,7 @@ function fit() {
 }
 
 const SOUND_OF: Record<BattleEvent, SoundName> = {
-    summon: 'summon', hit: 'hit', fall: 'fall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose', enemyMagic: 'enemyMagic', blocked: 'blocked'
+    summon: 'summon', hit: 'hit', fall: 'fall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose', enemyMagic: 'enemyMagic', blocked: 'blocked', wave: 'wave'
 };
 
 let finishing = false;
@@ -169,6 +171,9 @@ function draw() {
     const soon = enemyMagicSoon(battle);
     if (soon && !hud.warn) play('warn');
     hud.warn = soon ? { spell: soon.spell, seconds: Math.ceil(soon.ms / 1000), blockable: ENEMY_SPELLS[soon.spell].blockable, guarded: guarded(battle) } : null;
+    const wave = waveSoon(battle);
+    if (wave && !hud.wave) play('warn');
+    hud.wave = wave ? { seconds: Math.ceil(wave.ms / 1000) } : null;
     if (tutorial.value === 'fight' && hud.manaFull && ready.value) tutorial.value = 'magic';
     if (battle.result && !question.value && !word.value && !choices.value && !finishing) end();
 }
@@ -208,7 +213,7 @@ function magic() {
             const j = Math.floor(Math.random() * (i + 1));
             [elements[i], elements[j]] = [elements[j], elements[i]];
         }
-        choices.value = elements.map(e => ({ word: morseWord(e), group: e, rating: spellRating(battle, e) }));
+        choices.value = elements.map(e => ({ word: morseWord(e), group: e, rating: spellRating(battle, e), tips: spellTips(battle, e) }));
     } else {
         choices.value = kanjiChoices();
     }
@@ -231,7 +236,7 @@ function kanjiChoices(): Choice[] {
         const group = spellGroup(item.kanji);
         const element = elementOfGroup(group);
         const rating = group === 'metal' || group === 'word' ? 'none' : element ? spellRating(battle, element) : 'normal';
-        return { question: questionFor(item), group, rating };
+        return { question: questionFor(item), group, rating, tips: spellTips(battle, group) };
     });
 }
 
@@ -389,10 +394,16 @@ const unitLabel = (u: (typeof deck)[number]) => `${plain(u.form.name)}（${u.cos
 
         <div ref="field" class="battle-field">
             <canvas ref="canvas" aria-label="戦いの 様子"></canvas>
-            <p v-if="hud.warn && !hud.result" class="enemy-warn" :class="{ 'is-guarded': hud.warn.guarded && hud.warn.blockable }" role="status">
-                <span class="enemy-warn-title"><Furi :text="`[敵|てき]の [魔法|まほう]が くる！ ${ENEMY_SPELLS[hud.warn.spell].name}（${hud.warn.seconds}）`" /></span>
-                <small><Furi :text="hud.warn.guarded && hud.warn.blockable ? 'バリアで [守|まも]っているよ' : hud.warn.blockable ? `${ENEMY_SPELLS[hud.warn.spell].does}。まもりで ふせげるよ` : `${ENEMY_SPELLS[hud.warn.spell].does}。[攻撃|こうげき]の [魔法|まほう]で やぶろう`" /></small>
-            </p>
+            <div v-if="!hud.result && (hud.warn || hud.wave)" class="field-warns">
+                <p v-if="hud.warn" class="enemy-warn" :class="{ 'is-guarded': hud.warn.guarded && hud.warn.blockable }" role="status">
+                    <span class="enemy-warn-title"><Furi :text="`[敵|てき]の [魔法|まほう]が くる！ ${ENEMY_SPELLS[hud.warn.spell].name}（${hud.warn.seconds}）`" /></span>
+                    <small><Furi :text="hud.warn.guarded && hud.warn.blockable ? 'バリアで [守|まも]っているよ' : hud.warn.blockable ? `${ENEMY_SPELLS[hud.warn.spell].does}。まもりで ふせげるよ` : `${ENEMY_SPELLS[hud.warn.spell].does}。[攻撃|こうげき]の [魔法|まほう]で やぶろう`" /></small>
+                </p>
+                <p v-if="hud.wave" class="enemy-warn is-wave" role="status">
+                    <span class="enemy-warn-title"><Furi :text="`[大群|たいぐん]が くる！（${hud.wave.seconds}）`" /></span>
+                    <small><Furi text="[魔法|まほう]を ためておいて、みんな [出|で]てきたら [使|つか]おう" /></small>
+                </p>
+            </div>
             <p v-if="hud.result" class="battle-banner" :class="hud.result"><Furi :text="hud.result === 'win' ? '[勝|か]ち！' : '[負|ま]けちゃった…'" /></p>
         </div>
 
@@ -524,13 +535,22 @@ canvas {
     touch-action: manipulation;
 }
 
-/* The enemy's magic is coming: over the top of the field (not in the HUD: nothing under it moves) */
-.enemy-warn {
+/* The enemy's magic or a big wave is coming: over the top of the field (not in the HUD: nothing
+   under it moves); both at once, one under the other */
+.field-warns {
     position: absolute;
     top: 0.4rem;
     left: 50%;
     translate: -50% 0;
     max-width: calc(100% - 1rem);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    pointer-events: none;
+}
+
+.enemy-warn {
     margin: 0;
     padding: 0.25rem 0.75rem;
     border-radius: 0.6rem;
@@ -559,6 +579,10 @@ canvas {
     animation: none;
 }
 
+.enemy-warn.is-wave {
+    background: rgb(150 52 20 / 0.88);
+}
+
 @keyframes warn-pulse {
     to { box-shadow: 0 0 0 4px rgb(229 153 247 / 0.7); }
 }
@@ -573,8 +597,12 @@ canvas {
         box-shadow: 0 2px 0 var(--rule), 0 -2px 0 var(--rule);
     }
 
-    .enemy-warn {
+    .field-warns {
         top: 0.25rem;
+        gap: 0.15rem;
+    }
+
+    .enemy-warn {
         padding: 0.1rem 0.6rem;
         white-space: nowrap;
     }

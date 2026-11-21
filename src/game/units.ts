@@ -32,6 +32,8 @@ export interface UnitType {
     knockback: number;
     // Hits everything in its reach, not only the nearest
     area: boolean;
+    // Aims first at a こもりうた in its reach (not the nearest)
+    snipe?: boolean;
     size: number;
     // The stage to clear before it can be used (0: from the start)
     unlockAfter: number;
@@ -60,7 +62,7 @@ export const UNITS: Record<UnitId, UnitType> = {
     },
     neko: {
         id: 'neko', element: 'fire', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 150, attack: 40, attackMs: 1600, range: 240, speed: 30,
-        knockback: 0, area: false, size: 34, unlockAfter: 2,
+        knockback: 0, area: false, snipe: true, size: 34, unlockAfter: 2,
         forms: [
             { name: 'ヒゲ[長|なが]ネコ', color: '#f6b25a' },
             { name: 'ヒゲもじゃネコ', color: '#e8e0d0' },

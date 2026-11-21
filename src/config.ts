@@ -90,6 +90,10 @@ export const MANA_MAX = 100;
 export const MANA_PER_SECOND = 2.2;
 // The spells hurt the boss less, and push it back less
 export const BOSS_SPELL_RESIST = 0.5;
+// Against the enemies of a stage stronger than this power (from the 11th), the spells hurt and
+// shield more (the square root of power / this: battle.ts spellGrowth): else, the enemies grown,
+// the magic would not count any more
+export const SPELL_GROWS_FROM = 3.5;
 // --- The enemy's magic (the enemy tower casts it, from the 6th stage: stages.ts enemyMagic) ---
 // It is told this long (ms of the battle) before it goes off. sleep: ours on the field stop
 // (not those with a barrier); meteor: ours lose this part of their max hp (the barrier takes it)
@@ -103,6 +107,10 @@ export const ENEMY_MAGIC = {
     futon: { shield: 60 },
     blockRefund: 0.5
 } as const;
+
+// --- The big waves (from the 11th stage: stages.ts waves) ---
+// Told this long (ms of the battle) before; the enemies of a wave come out this far apart
+export const WAVE = { warnMs: 10000, gapMs: 600 } as const;
 
 // --- The units: levels and evolutions ---
 export const MAX_LEVEL = 10;
