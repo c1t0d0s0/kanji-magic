@@ -49,7 +49,7 @@ export interface UnitType {
 
 export const UNITS: Record<UnitId, UnitType> = {
     purun: {
-        id: 'purun', element: 'water', role: '[壁|かべ]', cost: 50, cooldownMs: 2000, hp: 260, attack: 8, attackMs: 1200, range: 28, speed: 32,
+        id: 'purun', element: 'water', role: '[壁|かべ]', cost: 50, cooldownMs: 2000, hp: 280, attack: 10, attackMs: 1200, range: 28, speed: 32,
         knockback: 0, area: false, size: 34, unlockAfter: 0,
         forms: [
             { name: 'ぷるりん', color: '#7fd0f2' },
@@ -58,7 +58,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     kaeru: {
-        id: 'kaeru', element: 'wood', role: '[近|ちか]く', cost: 150, cooldownMs: 4000, hp: 220, attack: 32, attackMs: 1000, range: 32, speed: 36,
+        id: 'kaeru', element: 'wood', role: '[近|ちか]く', cost: 150, cooldownMs: 4000, hp: 240, attack: 34, attackMs: 1000, range: 32, speed: 36,
         knockback: 0, area: false, size: 36, unlockAfter: 0,
         forms: [
             { name: '[眉毛|まゆげ]ガエル', color: '#7ccf5a' },
@@ -67,7 +67,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     neko: {
-        id: 'neko', element: 'fire', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 150, attack: 40, attackMs: 1600, range: 240, speed: 30,
+        id: 'neko', element: 'fire', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 165, attack: 42, attackMs: 1600, range: 240, speed: 30,
         knockback: 0, area: false, snipe: true, antiAir: true, size: 34, unlockAfter: 2,
         forms: [
             { name: 'ヒゲ[長|なが]ネコ', color: '#f6b25a' },
@@ -76,7 +76,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     pengin: {
-        id: 'pengin', element: 'fire', role: '[速|はや]い', cost: 400, cooldownMs: 7000, hp: 240, attack: 45, attackMs: 900, range: 44, speed: 80,
+        id: 'pengin', element: 'fire', role: '[速|はや]い', cost: 400, cooldownMs: 7000, hp: 270, attack: 48, attackMs: 900, range: 44, speed: 80,
         knockback: 40, area: false, size: 36, unlockAfter: 4,
         forms: [
             { name: 'ローラーペンギン', color: '#3a4a6a' },
@@ -85,7 +85,7 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     kaba: {
-        id: 'kaba', element: 'water', role: '[重|おも]い', cost: 600, cooldownMs: 12000, hp: 900, attack: 70, attackMs: 2200, range: 70, speed: 18,
+        id: 'kaba', element: 'water', role: '[重|おも]い', cost: 600, cooldownMs: 12000, hp: 960, attack: 74, attackMs: 2200, range: 70, speed: 18,
         knockback: 0, area: true, size: 48, unlockAfter: 6,
         forms: [
             { name: 'どすこいカバ', color: '#b7a6c9' },
@@ -94,8 +94,8 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     usagi: {
-        id: 'usagi', element: 'wood', role: '[跳|と]び・[対空|たいくう]', cost: 220, cooldownMs: 4500, hp: 210, attack: 36, attackMs: 950, range: 48, speed: 66,
-        knockback: 24, area: false, antiAir: true, antiAirBonus: 1.6, size: 34, unlockAfter: 7,
+        id: 'usagi', element: 'wood', role: '[跳|と]び・[対空|たいくう]', cost: 220, cooldownMs: 4500, hp: 225, attack: 38, attackMs: 950, range: 48, speed: 66,
+        knockback: 24, area: false, antiAir: true, antiAirBonus: 1.65, size: 34, unlockAfter: 8,
         forms: [
             { name: 'バネうさぎ', color: '#f7a8b8' },
             { name: 'ダブルバネうさぎ', color: '#e882b4' },
@@ -103,8 +103,8 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     fukurou: {
-        id: 'fukurou', element: 'wood', role: '[空|そら]', cost: 320, cooldownMs: 6500, hp: 200, attack: 42, attackMs: 1350, range: 150, speed: 44,
-        knockback: 0, area: false, flying: true, antiAir: true, size: 34, unlockAfter: 9,
+        id: 'fukurou', element: 'wood', role: '[空|そら]', cost: 320, cooldownMs: 6500, hp: 220, attack: 44, attackMs: 1350, range: 150, speed: 44,
+        knockback: 0, area: false, flying: true, antiAir: true, size: 34, unlockAfter: 11,
         forms: [
             { name: 'プロペラフクロウ', color: '#9c785c' },
             { name: 'ヘリコプターフクロウ', color: '#4d9b6a' },
@@ -112,8 +112,8 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     zou: {
-        id: 'zou', element: 'water', role: '[遠|とお]く・[対空|たいくう]', cost: 350, cooldownMs: 6500, hp: 210, attack: 44, attackMs: 1450, range: 250, speed: 28,
-        knockback: 22, area: false, snipe: true, antiAir: true, antiAirBonus: 1.6, size: 38, unlockAfter: 11,
+        id: 'zou', element: 'water', role: '[遠|とお]く・[対空|たいくう]', cost: 350, cooldownMs: 6500, hp: 230, attack: 46, attackMs: 1450, range: 250, speed: 28,
+        knockback: 22, area: false, snipe: true, antiAir: true, antiAirBonus: 1.65, size: 38, unlockAfter: 14,
         forms: [
             { name: 'ラッパゾウ', color: '#7db7e8' },
             { name: 'トロンボーンゾウ', color: '#569bd5' },
@@ -121,8 +121,8 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     tanuki: {
-        id: 'tanuki', element: 'wood', role: '[広|ひろ]く', cost: 480, cooldownMs: 9500, hp: 640, attack: 58, attackMs: 1800, range: 88, speed: 24,
-        knockback: 15, area: true, size: 44, unlockAfter: 13,
+        id: 'tanuki', element: 'wood', role: '[広|ひろ]く', cost: 480, cooldownMs: 9500, hp: 700, attack: 62, attackMs: 1800, range: 92, speed: 24,
+        knockback: 15, area: true, size: 44, unlockAfter: 17,
         forms: [
             { name: 'たいこタヌキ', color: '#b5835a' },
             { name: 'おおだいこタヌキ', color: '#9a653c' },
@@ -130,8 +130,8 @@ export const UNITS: Record<UnitId, UnitType> = {
         ]
     },
     buta: {
-        id: 'buta', element: 'fire', role: '[空|そら]・[広|ひろ]く', cost: 560, cooldownMs: 11000, hp: 460, attack: 64, attackMs: 2000, range: 165, speed: 30,
-        knockback: 0, area: true, flying: true, antiAir: true, size: 42, unlockAfter: 15,
+        id: 'buta', element: 'fire', role: '[空|そら]・[広|ひろ]く', cost: 560, cooldownMs: 11000, hp: 520, attack: 72, attackMs: 2000, range: 175, speed: 30,
+        knockback: 0, area: true, flying: true, antiAir: true, size: 42, unlockAfter: 20,
         forms: [
             { name: 'ふうせんブタ', color: '#ffb3c6' },
             { name: 'ききゅうブタ', color: '#ff8fab' },

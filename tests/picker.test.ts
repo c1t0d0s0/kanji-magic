@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_LEVEL } from '../src/config';
 import { kanjiDatabase } from '../src/vendor/kanji-quiz/src/data/kanji';
 import { strokes as models } from '../src/vendor/kanji-quiz/src/data/kanjivg';
 import { createRng } from '../src/vendor/kanji-quiz/src/core/battle';
@@ -195,7 +196,7 @@ describe('the save', () => {
             stages: { 1: { cleared: true, stars: 7 } }
         }));
         expect(s.settings).toMatchObject({ grade: 6, volume: 0.7, trace: true });
-        expect(s.units).toMatchObject({ kaeru: 10, purun: 1 });
+        expect(s.units).toMatchObject({ kaeru: MAX_LEVEL, purun: 1 });
         expect(s.deck).toEqual(['kaeru']);
         expect(s.progress).toHaveLength(1);
         expect(s.progress[0]).toMatchObject({ char: '火', attempts: 3, successes: 0 });

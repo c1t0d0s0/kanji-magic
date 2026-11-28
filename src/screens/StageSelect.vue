@@ -120,15 +120,26 @@ const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(3 - n);
     font-size: 1rem;
 }
 
-/* On a wide screen (a PC): 4 in a row, so the 20 fit with no scrolling */
+/* On a wide screen (a PC): 5 in a row, so all 30 fit cleanly */
 @media (min-width: 64em) {
     .stage-select {
-        max-width: 80rem;
+        max-width: 84rem;
     }
 
     .stages {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 0.45rem;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.4rem;
+    }
+
+    .stage {
+        padding-block: 0.3rem;
+        gap: 0.05rem 0.55rem;
+    }
+
+    .stage-no {
+        width: 2.1rem;
+        height: 2.1rem;
+        font-size: 0.9rem;
     }
 }
 </style>

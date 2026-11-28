@@ -113,11 +113,11 @@ export const ENEMY_MAGIC = {
 export const WAVE = { warnMs: 10000, gapMs: 600 } as const;
 
 // --- The units: levels and evolutions ---
-export const MAX_LEVEL = 10;
+export const MAX_LEVEL = 15;
 // The level a unit takes its 2nd and 3rd look at
-export const EVOLVE_AT = [4, 8] as const;
+export const EVOLVE_AT = [5, 10] as const;
 // Each level makes hp and attack this much stronger (of the level 1); each evolution a bit more
-export const LEVEL_GROWTH = 0.18;
+export const LEVEL_GROWTH = 0.16;
 export const EVOLVE_BONUS = 0.25;
 // どんぐり (the material to make units stronger) needed to go from a level to the next
 export const upgradeCost = (level: number) => 10 * level;

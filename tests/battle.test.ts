@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, LANE, MANA_MAX, MANA_REFUND, START_MONEY, WALLET, WAVE } from '../src/config';
+import { AFFINITY, BOSS_ELEMENT_MS, BOSS_SPELL_RESIST, ENEMY_MAGIC, LANE, MANA_MAX, MANA_REFUND, MAX_LEVEL, START_MONEY, WALLET, WAVE } from '../src/config';
 import {
     BURN_MS, canSummon, castSpell, createBattle, enemyMagicSoon, guarded, manaFull, rewardOf, spellRating, spellTips, starsOf, startSpell, step, summon, upgradeWallet, waveEnemies,
     waveSoon, type Battle
@@ -28,8 +28,8 @@ const enemyAt = (b: Battle, x: number, id: keyof typeof ENEMIES = 'zako', elemen
 };
 
 describe('stages and units', () => {
-    it('has 20 stages; the 1st is the tutorial, bosses come every 5th', () => {
-        expect(STAGES.map(s => s.id)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    it('has 30 stages; the 1st is the tutorial, bosses come every 5th', () => {
+        expect(STAGES.map(s => s.id)).toEqual(Array.from({ length: 30 }, (_, i) => i + 1));
         expect(STAGES[0].tutorial).toBe(true);
         for (const s of STAGES) {
             expect(s.spawns.some(r => ENEMIES[r.enemy].boss), `stage ${s.id}`).toBe(s.id % 5 === 0);
@@ -59,19 +59,19 @@ describe('stages and units', () => {
         expect(unlockedUnits(2)).toContain('neko');
         expect(unlockedUnits(4)).toContain('pengin');
         expect(unlockedUnits(6)).toEqual(['purun', 'kaeru', 'neko', 'pengin', 'kaba']);
-        expect(unlockedUnits(7)).toContain('usagi');
-        expect(unlockedUnits(9)).toContain('fukurou');
-        expect(unlockedUnits(11)).toContain('zou');
-        expect(unlockedUnits(13)).toContain('tanuki');
-        expect(unlockedUnits(15)).toHaveLength(10);
+        expect(unlockedUnits(8)).toContain('usagi');
+        expect(unlockedUnits(11)).toContain('fukurou');
+        expect(unlockedUnits(14)).toContain('zou');
+        expect(unlockedUnits(17)).toContain('tanuki');
+        expect(unlockedUnits(20)).toHaveLength(10);
     });
 
     it('evolves twice, getting stronger with each level', () => {
-        expect([1, 3, 4, 7, 8, 10].map(formOf)).toEqual([0, 0, 1, 1, 2, 2]);
-        for (let l = 2; l <= 10; l++) expect(levelPower(l)).toBeGreaterThan(levelPower(l - 1));
+        expect([1, 4, 5, 9, 10, 15].map(formOf)).toEqual([0, 0, 1, 1, 2, 2]);
+        for (let l = 2; l <= MAX_LEVEL; l++) expect(levelPower(l)).toBeGreaterThan(levelPower(l - 1));
         for (const u of Object.values(UNITS)) {
             expect(new Set(u.forms.map(f => f.name)).size).toBe(3);
-            expect(unitStats(u.id, 10).hp).toBeGreaterThan(unitStats(u.id, 1).hp);
+            expect(unitStats(u.id, MAX_LEVEL).hp).toBeGreaterThan(unitStats(u.id, 1).hp);
         }
     });
 });
@@ -232,7 +232,7 @@ describe('a whole stage (a simple player)', () => {
 
     it('from the 11th, the way that won the first 10 does not win, even 2 levels up', () => {
         for (const s of STAGES.filter(st => st.id >= 11)) {
-            for (const level of [levelAt(s.id), Math.min(10, levelAt(s.id) + 2)]) {
+            for (const level of [levelAt(s.id), Math.min(MAX_LEVEL, levelAt(s.id) + 2)]) {
                 expect(autoplay(s, { spell: 'success', level }).result, `stage ${s.id} Lv${level}`).not.toBe('win');
             }
         }

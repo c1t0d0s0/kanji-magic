@@ -137,6 +137,57 @@ export const SCENES: Record<number, Scene> = {
     20: {
         ...MEADOW, time: 'night', sky: ['#3a1c71', '#d76d77'], land: 'flat', near: '#8e6cc4', landmark: 'islands', ground: 'cloud',
         groundColor: '#e6dcf7', edge: '#c8b6ff', weather: 'sparkles', clouds: 3, cloudColor: 'rgb(255 220 240 / 0.7)', tower: { pillows: ['#c77dff', '#ffafcc', '#ffd23f'], cap: '#3c096c', topper: 'wizard' }
+    },
+    // --- Stages 21–30: Sky, Storm, Starry Realms, and the Cosmic Dream ---
+    // 21: 虹の 雲海
+    21: {
+        ...MEADOW, sky: ['#74c0fc', '#ffe3ec'], land: 'flat', near: '#f8f0fc', landmark: 'rainbow', ground: 'cloud',
+        groundColor: '#fff5fa', edge: '#f3d9fa', weather: 'petals', clouds: 5, tower: { pillows: ['#ffc8dd', '#bde0fe', '#fff3b0'], cap: '#7b2cbf', topper: 'bow' }
+    },
+    // 22: 空飛ぶ 広場
+    22: {
+        ...MEADOW, time: 'evening', sky: ['#f783ac', '#ffe066'], land: 'flat', near: '#f3d9fa', landmark: 'islands', ground: 'stone',
+        groundColor: '#dfd3e3', edge: '#b8a8c4', weather: 'wind', clouds: 4, cloudColor: 'rgb(255 235 220 / 0.85)', tower: { pillows: ['#ff9f1c', '#ffd23f', '#a2d2ff'], cap: '#9d4edd', topper: 'clock' }
+    },
+    // 23: 時計の 迷宮
+    23: {
+        ...MEADOW, time: 'night', sky: ['#1b263b', '#415a77'], land: 'flat', near: '#3a5a40', landmark: 'hedges', ground: 'stone',
+        groundColor: '#5c677d', edge: '#465066', weather: 'fireflies', clouds: 2, cloudColor: 'rgb(140 160 195 / 0.5)', tower: { pillows: ['#f2c14e', '#c8b6ff', '#e9c46a'], cap: '#1b263b', topper: 'clock' }
+    },
+    // 24: 氷の 洞窟
+    24: {
+        ...MEADOW, time: 'cave', sky: ['#16324f', '#3e92cc'], land: 'mountains', far: '#2a628f', near: '#4ea8de', landmark: 'rocks',
+        ground: 'snow', groundColor: '#dff3ff', edge: '#a9d6f5', weather: 'drips', clouds: 0, tower: { pillows: ['#caf0f8', '#90e0ef', '#ffffff'], cap: '#023e8a', topper: 'helmet' }
+    },
+    // 25: 大わすれ 火山 (Boss)
+    25: {
+        ...MEADOW, time: 'evening', sky: ['#c92a2a', '#ff922b'], land: 'mountains', far: '#7f1d1d', near: '#5c2b29', landmark: 'castle',
+        ground: 'rock', groundColor: '#6b4c4c', edge: '#4d3333', weather: 'sparkles', clouds: 3, cloudColor: 'rgb(255 180 140 / 0.7)', tower: { pillows: ['#e5383b', '#ff9f1c', '#ffd23f'], cap: '#590d22', topper: 'crown' }
+    },
+    // 26: 嵐の 海
+    26: {
+        ...MEADOW, time: 'night', sky: ['#0d1b2a', '#2b4c7e'], land: 'flat', near: '#1d3557', landmark: 'none', water: '#1b4965',
+        ground: 'sand', groundColor: '#7b8fa1', edge: '#5c7082', weather: 'rain', clouds: 6, cloudColor: 'rgb(70 90 120 / 0.85)', tower: { pillows: ['#4cc9f0', '#4895ef', '#cdb4db'], cap: '#0d1b2a', topper: 'helmet' }
+    },
+    // 27: 星空の 町
+    27: {
+        ...MEADOW, time: 'night', sky: ['#10002b', '#3c096c'], land: 'flat', near: '#240046', landmark: 'town', ground: 'stone',
+        groundColor: '#4a4e69', edge: '#33364d', weather: 'shooting', clouds: 1, cloudColor: 'rgb(130 100 180 / 0.5)', tower: { pillows: ['#ffd23f', '#ff8fab', '#9d4edd'], cap: '#240046', topper: 'bow' }
+    },
+    // 28: 眠りの 雪原
+    28: {
+        ...MEADOW, time: 'night', sky: ['#1d2d44', '#4a6fa5'], land: 'mountains', far: '#5c7fa3', near: '#7b9ec2', landmark: 'pines',
+        ground: 'snow', groundColor: '#e9f1fb', edge: '#c2d4ea', weather: 'snow', clouds: 4, cloudColor: 'rgb(200 220 245 / 0.75)', tower: { pillows: ['#ffffff', '#bde0fe', '#c8b6ff'], cap: '#1d2d44', topper: 'wizard' }
+    },
+    // 29: 夢の 回廊
+    29: {
+        ...MEADOW, time: 'evening', sky: ['#5a189a', '#ff70a6'], land: 'mountains', far: '#7b2cbf', near: '#9d4edd', landmark: 'tower',
+        ground: 'stone', groundColor: '#7d6b91', edge: '#5d4d70', weather: 'fog', clouds: 3, cloudColor: 'rgb(240 190 230 / 0.65)', tower: { pillows: ['#ff70a6', '#c77dff', '#ffd23f'], cap: '#3c096c', topper: 'crown' }
+    },
+    // 30: わすれの 宇宙 (Final Boss)
+    30: {
+        ...MEADOW, time: 'night', sky: ['#050517', '#240046'], land: 'flat', near: '#3c096c', landmark: 'islands', ground: 'cloud',
+        groundColor: '#d0bfff', edge: '#9775fa', weather: 'shooting', clouds: 2, cloudColor: 'rgb(180 140 255 / 0.45)', tower: { pillows: ['#ffd23f', '#72efdd', '#ff4d6d'], cap: '#10002b', topper: 'wizard' }
     }
 };
 
