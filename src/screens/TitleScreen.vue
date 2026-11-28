@@ -6,7 +6,7 @@ import TitleParade from '../components/TitleParade.vue';
 import { go, save } from '../store';
 import { unlockAudio } from '../sound';
 
-function open(screen: 'stages' | 'book' | 'settings' | 'credits') {
+function open(screen: 'stages' | 'book' | 'characters' | 'settings' | 'credits') {
     unlockAudio();
     go(screen);
 }
@@ -19,6 +19,7 @@ function open(screen: 'stages' | 'book' | 'settings' | 'credits') {
         <nav class="title-menu">
             <button type="button" class="btn btn-primary btn-big" @click="open('stages')"><Furi text="[遊|あそ]ぶ" /></button>
             <button type="button" class="btn" @click="open('book')">📖 <Furi text="[魔法|まほう]の [本|ほん]" /></button>
+            <button type="button" class="btn" @click="open('characters')">🐾 <Furi text="キャラクター[一覧|いちらん]" /></button>
             <button type="button" class="btn" @click="open('settings')">⚙️ <Furi :text="`[設定|せってい]（[今|いま] ${save.settings.grade}[年生|ねんせい]）`" /></button>
             <button type="button" class="btn" @click="open('credits')">クレジット</button>
         </nav>

@@ -5,7 +5,7 @@ import {
     waveSoon, type Battle
 } from '../src/game/battle';
 import { ENEMIES, ENEMY_IDS, SPLIT_INTO } from '../src/game/enemies';
-import { STAGES, stageById, type Stage } from '../src/game/stages';
+import { STAGES, seenEnemies, stageById, type Stage } from '../src/game/stages';
 import { UNITS, formOf, levelPower, unitStats, unlockedUnits } from '../src/game/units';
 import { effectOfGroup, spellEffect } from '../src/spell/effects';
 import type { Element } from '../src/spell/elements';
@@ -37,18 +37,33 @@ describe('stages and units', () => {
         }
     });
 
-    it('has 10 kinds of enemies, each seen in some stage', () => {
-        expect(ENEMY_IDS).toHaveLength(10);
+    it('has 16 kinds of enemies, each seen in some stage', () => {
+        expect(ENEMY_IDS).toHaveLength(16);
         expect(Object.keys(ENEMIES).sort()).toEqual([...ENEMY_IDS].sort());
-        const seen = new Set(STAGES.flatMap(s => s.spawns.map(r => r.enemy)));
+        const seen = new Set(STAGES.flatMap(s => [...s.spawns.map(r => r.enemy), ...(s.waves ?? []).flatMap(w => w.enemies.map(e => e.enemy))]));
         for (const id of ENEMY_IDS) expect(seen.has(id), id).toBe(true);
     });
 
-    it('gives 2 or 3 units at first, more as the stages are cleared', () => {
+    it('seenEnemies returns only enemies from cleared stages (spawns and waves)', () => {
+        expect([...seenEnemies([])]).toEqual([]);
+        expect([...seenEnemies([1])]).toEqual(['zako']);
+        const st3 = seenEnemies([1, 2, 3]);
+        expect(st3.has('kasa')).toBe(true);
+        expect(st3.has('boss')).toBe(false);
+        const all = seenEnemies(STAGES.map(s => s.id));
+        expect(all.size).toBe(ENEMY_IDS.length);
+    });
+
+    it('gives 2 units at first, more as the stages are cleared up to 10', () => {
         expect(unlockedUnits(0)).toEqual(['purun', 'kaeru']);
         expect(unlockedUnits(2)).toContain('neko');
         expect(unlockedUnits(4)).toContain('pengin');
         expect(unlockedUnits(6)).toEqual(['purun', 'kaeru', 'neko', 'pengin', 'kaba']);
+        expect(unlockedUnits(7)).toContain('usagi');
+        expect(unlockedUnits(9)).toContain('fukurou');
+        expect(unlockedUnits(11)).toContain('zou');
+        expect(unlockedUnits(13)).toContain('tanuki');
+        expect(unlockedUnits(15)).toHaveLength(10);
     });
 
     it('evolves twice, getting stronger with each level', () => {
@@ -408,8 +423,8 @@ describe('the new enemies', () => {
         return { harm: hp - e.hp, moved: e.x - x, plain: UNITS[unit].attack };
     };
 
-    it('ふかふか: only the カバ hurts it well (the others a little), and it is not pushed back', () => {
-        expect(ENEMIES.fluffy.counters).toEqual(['kaba']);
+    it('ふかふか: only カバ and タヌキ hurt it well (the others a little), and it is not pushed back', () => {
+        expect(ENEMIES.fluffy.counters).toEqual(['kaba', 'tanuki']);
         expect(firstHit('fluffy', 'kaba').harm).toBeCloseTo(UNITS.kaba.attack * ENEMIES.fluffy.bane!);
         const kaeru = firstHit('fluffy', 'kaeru');
         expect(kaeru.harm).toBeCloseTo(UNITS.kaeru.attack * ENEMIES.fluffy.soft!);
@@ -517,11 +532,80 @@ describe('the new enemies', () => {
     });
 
     it('from the 11th the enemies have tips, and the units good against them are taken from the deck', () => {
-        for (const id of ['bell', 'fluffy', 'twin', 'singer', 'king'] as const) {
+        for (const id of ['bell', 'fluffy', 'twin', 'singer', 'fuusen', 'spring', 'ufo', 'king'] as const) {
             expect(ENEMIES[id].tip, id).toBeTruthy();
             expect(ENEMIES[id].counters?.length, id).toBeGreaterThan(0);
         }
-        for (const id of ['zako', 'hard', 'fast', 'thrower', 'boss'] as const) expect(ENEMIES[id].tip, id).toBeUndefined();
+        for (const id of ['zako', 'hard', 'fast', 'thrower', 'boss', 'kasa', 'bento', 'yawn'] as const) expect(ENEMIES[id].tip, id).toBeUndefined();
+    });
+
+    it('flying and anti-air: ground melee passes under flyers, antiAir/flying hit them (with bonus), and spells hit all', () => {
+        // Ground melee (kaeru) cannot hit flying enemy (kasa) and walks right underneath
+        const b1 = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [{ enemy: 'kasa', from: 0, every: 1, count: 1 }] }, [{ id: 'kaeru', level: 1 }]);
+        b1.money = 1e5;
+        step(b1, DT);
+        const flyer = b1.fighters.find(f => f.kind === 'kasa')!;
+        flyer.x = 500;
+        flyer.speed = 0;
+        flyer.attack = 0;
+        summon(b1, 'kaeru');
+        const kaeru = b1.fighters.find(f => f.kind === 'kaeru')!;
+        kaeru.x = 550;
+        run(b1, 3000);
+        expect(flyer.hp).toBe(flyer.maxHp);
+        expect(kaeru.x).toBeLessThan(flyer.x);
+
+        // Anti-air specialist (usagi) hits flying enemy with antiAirBonus
+        const b2 = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [{ enemy: 'kasa', from: 0, every: 1, count: 1 }] }, [{ id: 'usagi', level: 1 }]);
+        b2.money = 1e5;
+        step(b2, DT);
+        const kasa2 = b2.fighters.find(f => f.kind === 'kasa')!;
+        kasa2.x = 500;
+        kasa2.hp = kasa2.maxHp = 5000;
+        kasa2.speed = 0;
+        kasa2.attack = 0;
+        summon(b2, 'usagi');
+        const usagi = b2.fighters.find(f => f.kind === 'usagi')!;
+        usagi.x = 540;
+        usagi.wait = 0;
+        step(b2, DT);
+        expect(kasa2.maxHp - kasa2.hp).toBeCloseTo(UNITS.usagi.attack * UNITS.usagi.antiAirBonus!);
+
+        // Spells hit flying enemies too
+        castSpell(b2, spellEffect('火', 'success', 4), 'success');
+        expect(kasa2.hp).toBeLessThan(kasa2.maxHp - UNITS.usagi.attack);
+
+        // Ground melee enemy (zako) cannot hit flying ally (fukurou), while antiAir enemy (thrower) can
+        const b3 = createBattle({ ...quiet, enemyBaseHp: 1e6, allyBaseHp: 1e6, spawns: [{ enemy: 'zako', from: 0, every: 1, count: 1 }] }, [{ id: 'fukurou', level: 1 }]);
+        b3.money = 1e5;
+        step(b3, DT);
+        const zako = b3.fighters.find(f => f.kind === 'zako')!;
+        zako.x = 450;
+        zako.wait = 0;
+        summon(b3, 'fukurou');
+        const owl = b3.fighters.find(f => f.kind === 'fukurou')!;
+        owl.x = 470;
+        owl.speed = 0;
+        owl.attack = 0;
+        run(b3, 1500);
+        expect(owl.hp).toBe(owl.maxHp);
+        expect(zako.x).toBeGreaterThan(owl.x);
+    });
+
+    it('boss and ally KOs fire distinct comical sound events and screen shake', () => {
+        const b = createBattle({ ...quiet, spawns: [{ enemy: 'boss', from: 0, every: 1, count: 1 }] }, [{ id: 'purun', level: 1 }]);
+        b.money = 1e5;
+        step(b, DT);
+        summon(b, 'purun');
+        const boss = b.fighters.find(f => f.kind === 'boss')!;
+        const ally = b.fighters.find(f => f.kind === 'purun')!;
+        boss.hp = 0;
+        ally.hp = 0;
+        b.events.length = 0;
+        step(b, DT);
+        expect(b.events).toContain('bossFall');
+        expect(b.events).toContain('allyFall');
+        expect(b.shakeMs).toBeGreaterThan(0);
     });
 });
 

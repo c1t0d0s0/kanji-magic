@@ -4,7 +4,7 @@
 import { EVOLVE_AT, EVOLVE_BONUS, LEVEL_GROWTH, MAX_LEVEL } from '../config';
 import type { Element } from '../spell/elements';
 
-export type UnitId = 'purun' | 'kaeru' | 'neko' | 'pengin' | 'kaba';
+export type UnitId = 'purun' | 'kaeru' | 'neko' | 'pengin' | 'kaba' | 'usagi' | 'fukurou' | 'zou' | 'tanuki' | 'buta';
 
 export interface UnitForm {
     name: string;
@@ -34,6 +34,12 @@ export interface UnitType {
     area: boolean;
     // Aims first at a こもりうた in its reach (not the nearest)
     snipe?: boolean;
+    // Flies high above the lane: ground melee enemies cannot hit it
+    flying?: boolean;
+    // Can hit flying enemies (flying units can always hit flying enemies too)
+    antiAir?: boolean;
+    // Extra damage multiplier when hitting flying enemies
+    antiAirBonus?: number;
     size: number;
     // The stage to clear before it can be used (0: from the start)
     unlockAfter: number;
@@ -62,7 +68,7 @@ export const UNITS: Record<UnitId, UnitType> = {
     },
     neko: {
         id: 'neko', element: 'fire', role: '[遠|とお]く', cost: 300, cooldownMs: 6000, hp: 150, attack: 40, attackMs: 1600, range: 240, speed: 30,
-        knockback: 0, area: false, snipe: true, size: 34, unlockAfter: 2,
+        knockback: 0, area: false, snipe: true, antiAir: true, size: 34, unlockAfter: 2,
         forms: [
             { name: 'ヒゲ[長|なが]ネコ', color: '#f6b25a' },
             { name: 'ヒゲもじゃネコ', color: '#e8e0d0' },
@@ -85,6 +91,51 @@ export const UNITS: Record<UnitId, UnitType> = {
             { name: 'どすこいカバ', color: '#b7a6c9' },
             { name: '[大関|おおぜき]カバ', color: '#a08cbf' },
             { name: '[横綱|よこづな]カバ', color: '#8a74b0' }
+        ]
+    },
+    usagi: {
+        id: 'usagi', element: 'wood', role: '[跳|と]び・[対空|たいくう]', cost: 220, cooldownMs: 4500, hp: 210, attack: 36, attackMs: 950, range: 48, speed: 66,
+        knockback: 24, area: false, antiAir: true, antiAirBonus: 1.6, size: 34, unlockAfter: 7,
+        forms: [
+            { name: 'バネうさぎ', color: '#f7a8b8' },
+            { name: 'ダブルバネうさぎ', color: '#e882b4' },
+            { name: 'ぎんがバネうさぎ', color: '#8f6be8' }
+        ]
+    },
+    fukurou: {
+        id: 'fukurou', element: 'wood', role: '[空|そら]', cost: 320, cooldownMs: 6500, hp: 200, attack: 42, attackMs: 1350, range: 150, speed: 44,
+        knockback: 0, area: false, flying: true, antiAir: true, size: 34, unlockAfter: 9,
+        forms: [
+            { name: 'プロペラフクロウ', color: '#9c785c' },
+            { name: 'ヘリコプターフクロウ', color: '#4d9b6a' },
+            { name: 'うちゅうせんフクロウ', color: '#5b6ee1' }
+        ]
+    },
+    zou: {
+        id: 'zou', element: 'water', role: '[遠|とお]く・[対空|たいくう]', cost: 350, cooldownMs: 6500, hp: 210, attack: 44, attackMs: 1450, range: 250, speed: 28,
+        knockback: 22, area: false, snipe: true, antiAir: true, antiAirBonus: 1.6, size: 38, unlockAfter: 11,
+        forms: [
+            { name: 'ラッパゾウ', color: '#7db7e8' },
+            { name: 'トロンボーンゾウ', color: '#569bd5' },
+            { name: 'オーケストラゾウ', color: '#3b6ea5' }
+        ]
+    },
+    tanuki: {
+        id: 'tanuki', element: 'wood', role: '[広|ひろ]く', cost: 480, cooldownMs: 9500, hp: 640, attack: 58, attackMs: 1800, range: 88, speed: 24,
+        knockback: 15, area: true, size: 44, unlockAfter: 13,
+        forms: [
+            { name: 'たいこタヌキ', color: '#b5835a' },
+            { name: 'おおだいこタヌキ', color: '#9a653c' },
+            { name: 'かみなりだいこタヌキ', color: '#7a4b2a' }
+        ]
+    },
+    buta: {
+        id: 'buta', element: 'fire', role: '[空|そら]・[広|ひろ]く', cost: 560, cooldownMs: 11000, hp: 460, attack: 64, attackMs: 2000, range: 165, speed: 30,
+        knockback: 0, area: true, flying: true, antiAir: true, size: 42, unlockAfter: 15,
+        forms: [
+            { name: 'ふうせんブタ', color: '#ffb3c6' },
+            { name: 'ききゅうブタ', color: '#ff8fab' },
+            { name: 'うちゅうロケットブタ', color: '#ff6b8b' }
         ]
     }
 };

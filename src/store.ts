@@ -20,7 +20,7 @@ export function persist() {
     writeSave(save);
 }
 
-export type Screen = 'title' | 'stages' | 'formation' | 'battle' | 'result' | 'book' | 'settings' | 'credits';
+export type Screen = 'title' | 'stages' | 'formation' | 'battle' | 'result' | 'book' | 'characters' | 'settings' | 'credits';
 
 export interface BattleReport {
     stage: Stage;

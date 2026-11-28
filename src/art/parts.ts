@@ -37,20 +37,22 @@ export function line(ctx: Ctx, pts: readonly (readonly [number, number])[], widt
     ctx.stroke();
 }
 
-export type EyeKind = 'open' | 'half' | 'closed' | 'shut' | 'spiral' | 'wide' | 'happy';
+export type EyeKind = 'open' | 'half' | 'closed' | 'shut' | 'spiral' | 'wide' | 'happy' | 'pop' | 'x';
 
 // A googly eye: the pupil wobbles a little behind the look (lx, ly in -1..1)
 export function eye(ctx: Ctx, x: number, y: number, r: number, kind: EyeKind, t: number, lx = 0.3, ly = 0) {
     const w = Math.max(1, r * 0.32);
     switch (kind) {
         case 'open':
-        case 'wide': {
-            const rr = kind === 'wide' ? r * 1.25 : r;
+        case 'wide':
+        case 'pop': {
+            const rr = kind === 'pop' ? r * 1.55 : kind === 'wide' ? r * 1.25 : r;
             oval(ctx, x, y, rr, rr, '#fff', r * 3);
-            const wob = Math.sin(t / 90) * 0.12;
-            const pr = rr * (kind === 'wide' ? 0.35 : 0.52);
+            const wob = kind === 'pop' ? Math.sin(t / 28) * 0.25 : Math.sin(t / 90) * 0.12;
+            const wy = kind === 'pop' ? Math.cos(t / 24) * 0.25 : Math.cos(t / 110) * 0.1;
+            const pr = rr * (kind === 'pop' ? 0.22 : kind === 'wide' ? 0.35 : 0.52);
             ctx.beginPath();
-            ctx.arc(x + (lx + wob) * (rr - pr), y + (ly + Math.cos(t / 110) * 0.1) * (rr - pr), pr, 0, Math.PI * 2);
+            ctx.arc(x + (lx + wob) * (rr - pr), y + (ly + wy) * (rr - pr), pr, 0, Math.PI * 2);
             ctx.fillStyle = OUTLINE;
             ctx.fill();
             ctx.beginPath();
@@ -59,6 +61,11 @@ export function eye(ctx: Ctx, x: number, y: number, r: number, kind: EyeKind, t:
             ctx.fill();
             break;
         }
+        case 'x':
+            // × comical knocked-out eye
+            line(ctx, [[x - r * 0.72, y - r * 0.72], [x + r * 0.72, y + r * 0.72]], w * 1.15);
+            line(ctx, [[x + r * 0.72, y - r * 0.72], [x - r * 0.72, y + r * 0.72]], w * 1.15);
+            break;
         case 'half':
             // Sleepy: an eye with the lid half down
             oval(ctx, x, y, r, r, '#fff', r * 3);
@@ -114,7 +121,7 @@ export function eye(ctx: Ctx, x: number, y: number, r: number, kind: EyeKind, t:
     }
 }
 
-export type MouthKind = 'smile' | 'open' | 'wavy' | 'frown' | 'o' | 'grin' | 'cat' | 'yawn';
+export type MouthKind = 'smile' | 'open' | 'wavy' | 'frown' | 'o' | 'grin' | 'cat' | 'yawn' | 'scream';
 
 export function mouth(ctx: Ctx, x: number, y: number, w: number, kind: MouthKind, t = 0) {
     const lw = Math.max(1, w * 0.16);
@@ -177,6 +184,26 @@ export function mouth(ctx: Ctx, x: number, y: number, w: number, kind: MouthKind
             ctx.arc(x + w * 0.18, y, w * 0.18, Math.PI, 0, true);
             ctx.stroke();
             break;
+        case 'scream': {
+            // Giant comical open-jaw shout
+            const rx = w * 0.56, ry = w * (0.68 + 0.12 * Math.sin(t / 35));
+            ctx.beginPath();
+            ctx.ellipse(x, y + ry * 0.12, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#7a2340';
+            ctx.fill();
+            ctx.stroke();
+            // Wiggling tongue
+            ctx.beginPath();
+            ctx.ellipse(x + Math.sin(t / 40) * rx * 0.15, y + ry * 0.5, rx * 0.52, ry * 0.3, 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#ff7f9a';
+            ctx.fill();
+            // Cartoon top tooth bar
+            ctx.beginPath();
+            ctx.roundRect(x - rx * 0.55, y - ry * 0.72, rx * 1.1, ry * 0.28, ry * 0.12);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            break;
+        }
     }
 }
 
@@ -223,6 +250,27 @@ export function dizzyStars(ctx: Ctx, x: number, y: number, r: number, t: number)
     }
 }
 
+// Spiky comic-book starburst for slapstick impacts
+export function burst(ctx: Ctx, x: number, y: number, r: number, points = 12, fill = '#fff3b0', stroke = '#e8590c', turn = 0) {
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+        const a = turn + (i * Math.PI) / points;
+        const rr = i % 2 ? r * 0.48 : r;
+        const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = Math.max(1.5, r * 0.08);
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
+}
+
 // Bold text with an outline, for the shouts (おもいだした！, カーン, …)
 export function shout(ctx: Ctx, text: string, x: number, y: number, px: number, fill: string, alpha = 1) {
     ctx.save();
@@ -236,5 +284,14 @@ export function shout(ctx: Ctx, text: string, x: number, y: number, px: number, 
     ctx.strokeText(text, x, y);
     ctx.fillStyle = fill;
     ctx.fillText(text, x, y);
+    ctx.restore();
+}
+
+// Tilted manga-style onomatopoeia shout (ドカーン！, ベチャッ！, ボヨン！)
+export function tiltShout(ctx: Ctx, text: string, x: number, y: number, px: number, fill: string, alpha = 1, angle = -0.18) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    shout(ctx, text, 0, 0, px, fill, alpha);
     ctx.restore();
 }

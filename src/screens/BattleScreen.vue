@@ -142,7 +142,7 @@ function fit() {
 }
 
 const SOUND_OF: Record<BattleEvent, SoundName> = {
-    summon: 'summon', hit: 'hit', fall: 'fall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose', enemyMagic: 'enemyMagic', blocked: 'blocked', wave: 'wave'
+    summon: 'summon', hit: 'hit', fall: 'fall', allyFall: 'allyFall', bossFall: 'bossFall', base: 'base', wallet: 'wallet', win: 'win', lose: 'lose', enemyMagic: 'enemyMagic', blocked: 'blocked', wave: 'wave'
 };
 
 let finishing = false;
@@ -761,7 +761,7 @@ canvas {
 .units {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    gap: 0.45rem;
 }
 
 .unit {
@@ -769,8 +769,8 @@ canvas {
     display: grid;
     justify-items: center;
     gap: 0.1rem;
-    width: 5rem;
-    padding: 0.4rem 0.25rem;
+    width: clamp(4.25rem, 21vw, 5rem);
+    padding: 0.35rem 0.2rem;
     border: 2px solid var(--rule);
     border-radius: 0.75rem;
     background: var(--paper);

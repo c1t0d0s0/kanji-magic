@@ -10,6 +10,8 @@ import type { KanjiItem } from '../vendor/kanji-quiz/src/data/kanji';
 import type { Reibun } from '../vendor/kanji-quiz/src/data/reibun';
 import SpellPrompt from '../components/SpellPrompt.vue';
 import SpellDebug from '../components/SpellDebug.vue';
+import MuteButton from '../components/MuteButton.vue';
+import MorsePractice from './MorsePractice.vue';
 import { useNoSelect } from '../components/noSelect';
 import { AUTO_CONFIRM_MS, SPELL_MULTIPLIER } from '../config';
 import { gradeSpell, SPELL_GRADE_LABEL, type SpellResult } from '../spell/grade';
@@ -22,6 +24,16 @@ import { loadTegaki, outcomeMessage, tegakiDebug, verdictMarks, type TegakiKit }
 useFitScreen();
 
 const GRADES = [1, 2, 3, 4, 5, 6];
+
+const initialMode = typeof location !== 'undefined' && new URLSearchParams(location.search).get('mode') === 'morse' ? 'morse' : 'kanji';
+const mode = ref<'kanji' | 'morse'>(initialMode);
+
+function switchMode(next: 'kanji' | 'morse') {
+    if (mode.value === next) return;
+    stopTimer();
+    count.value = 0;
+    mode.value = next;
+}
 
 const kit = shallowRef<TegakiKit | null>(null);
 const failed = ref(false);
@@ -131,49 +143,63 @@ onBeforeUnmount(stopTimer);
             <h1>まほうの れんしゅう</h1>
         </header>
 
-        <div class="practice-settings">
-            <div class="grades" role="group" aria-label="がくねん">
-                <button v-for="g in GRADES" :key="g" type="button" class="btn" :class="{ 'btn-primary': g === grade }"
-                    :aria-pressed="g === grade" @click="changeGrade(g)">{{ g }}ねん</button>
-            </div>
-            <label class="check">
-                <input v-model="strokeOrder" type="checkbox">
-                かきじゅんも みる
-            </label>
+        <div class="mode-tabs" role="group" aria-label="れんしゅうの しゅるい">
+            <button type="button" class="btn" :class="{ 'btn-primary': mode === 'kanji' }" :aria-pressed="mode === 'kanji'" @click="switchMode('kanji')">
+                ✏️ てがき かんじ
+            </button>
+            <button type="button" class="btn" :class="{ 'btn-primary': mode === 'morse' }" :aria-pressed="mode === 'morse'" @click="switchMode('morse')">
+                📡 モールス しんごう
+            </button>
         </div>
 
-        <SpellPrompt v-if="reibun" :reibun="reibun" :answer="result ? item?.kanji : null" />
-
-        <p v-if="failed" class="status">
-            じゅんびが できなかったよ。
-            <button type="button" class="btn" @click="load">もういちど</button>
-        </p>
-        <p v-else-if="!kit" class="status">じゅんびちゅう…</p>
-
-        <section ref="writing" class="tegaki no-select">
-            <WritingPad ref="pad" :locked="locked || !ready" :faded="locked && result?.grade !== 'perfect'" :mark="mark"
-                :highlight="locked ? marks.written : null" @count="onCount" @stroke="onStroke">
-                <!-- The model with the stroke order, unless it was かんぺき -->
-                <ModelStrokes v-if="locked && model && result?.grade !== 'perfect'" :model="model" :wrong="marks.stroke" />
-            </WritingPad>
-            <div class="tegaki-actions">
-                <template v-if="!locked">
-                    <button type="button" class="btn" :disabled="count === 0" @click="pad?.undo()">1かく もどす</button>
-                    <button type="button" class="btn" :disabled="count === 0" @click="pad?.clear()">ぜんぶ けす</button>
-                    <button type="button" class="btn btn-primary" :disabled="!ready" @click="cast">はつどう！</button>
-                </template>
-                <button v-else type="button" class="btn btn-primary" @click="pick">つぎの もんだい</button>
+        <template v-if="mode === 'kanji'">
+            <div class="practice-settings">
+                <div class="grades" role="group" aria-label="がくねん">
+                    <button v-for="g in GRADES" :key="g" type="button" class="btn" :class="{ 'btn-primary': g === grade }"
+                        :aria-pressed="g === grade" @click="changeGrade(g)">{{ g }}ねん</button>
+                </div>
+                <label class="check">
+                    <input v-model="strokeOrder" type="checkbox">
+                    かきじゅんも みる
+                </label>
             </div>
-        </section>
 
-        <div v-if="result" class="outcome" :class="result.grade">
-            <p class="outcome-grade">{{ SPELL_GRADE_LABEL[result.grade] }}<span class="outcome-power">いりょく ×{{ SPELL_MULTIPLIER[result.grade] }}</span></p>
-            <p class="outcome-message">{{ message }}</p>
-        </div>
+            <SpellPrompt v-if="reibun" :reibun="reibun" :answer="result ? item?.kanji : null" />
 
-        <SpellDebug v-if="tegakiDebug && result && item && debugLimits && judged" :kanji="item.kanji" :grade="item.grade"
-            :stroke-order="strokeOrder" :result="result" :limits="debugLimits" :writing="judged.writing" :size="judged.size" />
+            <p v-if="failed" class="status">
+                じゅんびが できなかったよ。
+                <button type="button" class="btn" @click="load">もういちど</button>
+            </p>
+            <p v-else-if="!kit" class="status">じゅんびちゅう…</p>
+
+            <section ref="writing" class="tegaki no-select">
+                <WritingPad ref="pad" :locked="locked || !ready" :faded="locked && result?.grade !== 'perfect'" :mark="mark"
+                    :highlight="locked ? marks.written : null" @count="onCount" @stroke="onStroke">
+                    <!-- The model with the stroke order, unless it was かんぺき -->
+                    <ModelStrokes v-if="locked && model && result?.grade !== 'perfect'" :model="model" :wrong="marks.stroke" />
+                </WritingPad>
+                <div class="tegaki-actions">
+                    <template v-if="!locked">
+                        <button type="button" class="btn" :disabled="count === 0" @click="pad?.undo()">1かく もどす</button>
+                        <button type="button" class="btn" :disabled="count === 0" @click="pad?.clear()">ぜんぶ けす</button>
+                        <button type="button" class="btn btn-primary" :disabled="!ready" @click="cast">はつどう！</button>
+                    </template>
+                    <button v-else type="button" class="btn btn-primary" @click="pick">つぎの もんだい</button>
+                </div>
+            </section>
+
+            <div v-if="result" class="outcome" :class="result.grade">
+                <p class="outcome-grade">{{ SPELL_GRADE_LABEL[result.grade] }}<span class="outcome-power">いりょく ×{{ SPELL_MULTIPLIER[result.grade] }}</span></p>
+                <p class="outcome-message">{{ message }}</p>
+            </div>
+
+            <SpellDebug v-if="tegakiDebug && result && item && debugLimits && judged" :kanji="item.kanji" :grade="item.grade"
+                :stroke-order="strokeOrder" :result="result" :limits="debugLimits" :writing="judged.writing" :size="judged.size" />
+        </template>
+
+        <MorsePractice v-else />
     </main>
+    <MuteButton v-if="mode === 'morse'" />
     <SiteFooter />
 </template>
 
@@ -201,6 +227,12 @@ onBeforeUnmount(stopTimer);
 h1 {
     font-family: var(--hand);
     font-size: 1.5rem;
+}
+
+.mode-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
 }
 
 .practice-settings {

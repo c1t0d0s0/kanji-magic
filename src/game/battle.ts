@@ -61,18 +61,30 @@ export interface Fighter {
     stun?: number;
     // Not pushed back, by the water spell or by a unit (ふかふか)
     heavy?: boolean;
-    // ネコ: aims first at a こもりうた in its reach
+    // ネコ・ゾウ: aims first at a こもりうた in its reach
     snipe?: boolean;
+    // Flies high above the lane: ground melee without antiAir cannot hit it
+    flying?: boolean;
+    // Can hit flying foes
+    antiAir?: boolean;
+    // Extra damage multiplier against flying foes
+    antiAirBonus?: number;
+    // Knockback multiplier (e.g. kasa blows back farther)
+    kbVuln?: number;
+    // Currently striking a flying foe (used for jump-attack animation)
+    targetFlying?: boolean;
+    // Last hit came from a spell (extra dramatic KO)
+    spellHit?: boolean;
     // ms it burns (a ふたご hit by the fire): if it falls now, it does not part
     burnMs?: number;
-    // Stopped by a めざまし or the ゆめのまおう (startled, not asleep: for the picture)
+    // Stopped by a めざまし, UFO or the ゆめのまおう (startled, not asleep: for the picture)
     startled?: boolean;
     // An enemy in the ふとん バリア (the enemy tower's magic): our units cannot hurt it; a spell breaks it
     pillow?: boolean;
 }
 
 // fly: one that fell flies away; shot: a thing thrown, from x to `to`; stomp: the ground shakes;
-// spark: a hit on the element it beats; good / weak: a spell that worked well / not well on most;
+// spark: a hit on the element it beats (or anti-air bonus); good / weak: a spell that worked well / not well on most;
 // change: the boss changed its element; damage: the harm a spell did to one enemy (a number over it);
 // heal: an enemy healed by a lullaby; split: a ふたご fell in two; sleep / meteor / futon: the enemy
 // tower's magic went off; blocked: the barrier stopped it there
@@ -88,6 +100,7 @@ export interface FxWho {
     size: number;
     color: string;
     element: Element | null;
+    flying?: boolean;
 }
 
 export interface Fx {
@@ -96,7 +109,12 @@ export interface Fx {
     ms: number;
     total: number;
     to?: number;
+    toFlying?: boolean;
     who?: FxWho;
+    // Deterministic seed for comical KO variation
+    seed?: number;
+    // Extra dramatic KO (boss or spell finisher)
+    big?: boolean;
     // damage: how much, and how well the element worked on that one
     amount?: number;
     tone?: 'good' | 'normal' | 'weak';
@@ -104,9 +122,11 @@ export interface Fx {
     stack?: number;
 }
 
-const whoOf = (f: Fighter): FxWho => ({ kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element });
+const whoOf = (f: Fighter): FxWho => ({
+    kind: f.kind, form: f.form, side: f.side, size: f.size, color: f.color, element: f.element, flying: f.flying
+});
 
-export type BattleEvent = 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'enemyMagic' | 'blocked' | 'wave';
+export type BattleEvent = 'summon' | 'hit' | 'fall' | 'allyFall' | 'bossFall' | 'base' | 'wallet' | 'win' | 'lose' | 'enemyMagic' | 'blocked' | 'wave';
 
 export interface Base {
     hp: number;
@@ -150,6 +170,9 @@ export interface Battle {
     nextId: number;
     kills: number;
     summoned: number;
+    // Screen shake (ms left and max px amplitude) for dramatic hits and boss KOs
+    shakeMs: number;
+    shakeAmp: number;
 }
 
 export function createBattle(stage: Stage, deck: readonly DeckUnit[]): Battle {
@@ -177,7 +200,9 @@ export function createBattle(stage: Stage, deck: readonly DeckUnit[]): Battle {
         events: [],
         nextId: 1,
         kills: 0,
-        summoned: 0
+        summoned: 0,
+        shakeMs: 0,
+        shakeAmp: 0
     };
 }
 
@@ -210,13 +235,17 @@ export function summon(b: Battle, id: UnitId) {
     const s = unitStats(id, d.level);
     b.money -= s.cost;
     b.cooldowns[id] = s.cooldownMs;
-    b.fighters.push({
+    const fighter: Fighter = {
         id: b.nextId++, side: 'ally', kind: id, form: formOf(d.level), element: s.element, color: s.form.color, size: s.size, boss: false,
         x: LANE.allyBase - s.size / 2, hp: s.hp, maxHp: s.hp, attack: s.attack, attackMs: s.attackMs, range: s.range,
         speed: s.speed, knockback: s.knockback, area: s.area, wait: s.attackMs * 0.3, stopMs: 0,
         shield: b.shieldMs > 0 ? b.shieldAmount : 0, hurtMs: 0, fighting: false, money: 0, mana: 0
-    });
-    if (s.snipe) b.fighters[b.fighters.length - 1].snipe = true;
+    };
+    if (s.snipe) fighter.snipe = true;
+    if (s.flying) fighter.flying = true;
+    if (s.antiAir || s.flying) fighter.antiAir = true;
+    if (s.antiAirBonus) fighter.antiAirBonus = s.antiAirBonus;
+    b.fighters.push(fighter);
     b.summoned++;
     b.events.push('summon');
     return true;
@@ -238,6 +267,9 @@ function enemyAt(b: Battle, id: EnemyId, element: Element | null, cycle: boolean
         speed: e.speed, knockback: e.knockback ?? 0, area: e.area ?? false, wait: e.attackMs * 0.3, stopMs: 0, shield: 0, hurtMs: 0, fighting: false,
         money: e.money, mana: e.mana
     };
+    if (e.flying) f.flying = true;
+    if (e.antiAir || e.flying) f.antiAir = true;
+    if (e.kbVuln) f.kbVuln = e.kbVuln;
     if (e.split) f.split = e.split;
     if (e.soft) f.soft = { part: e.soft, bane: e.bane ?? 1, except: e.counters ?? [] };
     if (e.stun) f.stun = e.stun;
@@ -315,15 +347,20 @@ export function castSpell(b: Battle, effect: SpellEffect | null, grade: SpellGra
                     f.shield = 0;
                 }
                 harm(f, dealt);
+                if (f.hp <= 0) f.spellHit = true;
                 // A ふたご hit by the fire burns: falling while it does, it does not part
                 if (effect.group === 'fire' && f.split) f.burnMs = BURN_MS;
-                if (effect.push && !f.heavy) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * resist(f));
+                if (effect.push && !f.heavy) f.x = Math.max(LANE.enemyBase + f.size / 2, f.x - effect.push * (f.kbVuln ?? 1) * resist(f));
                 if (effect.stopMs) f.stopMs = Math.max(f.stopMs, effect.stopMs * resist(f));
                 // Seen on each one (where the wave left it): a longer flinch, and the number over it
                 f.hurtMs = Math.max(f.hurtMs, SPELL_HURT_MS);
                 const stack = hitAt.filter(x => Math.abs(x - f.x) < 60).length;
                 hitAt.push(f.x);
                 b.fx.push({ kind: 'damage', x: f.x, ms: 0, total: 1300, who: whoOf(f), amount: Math.round(dealt), tone: k > 1 ? 'good' : k < 1 ? 'weak' : 'normal', stack });
+            }
+            if (hitAt.length > 0) {
+                b.shakeMs = Math.max(b.shakeMs, 260);
+                b.shakeAmp = Math.max(b.shakeAmp, 5);
             }
             if (good > weak) b.fx.push({ kind: 'good', x: middle, ms: 0, total: 1400 });
             else if (weak > good) b.fx.push({ kind: 'weak', x: middle, ms: 0, total: 1400 });
@@ -460,11 +497,14 @@ function enemyCast(b: Battle, spell: EnemySpell) {
 // A ふたご hit by the fire spell does not part if it falls within this time
 export const BURN_MS = 8000;
 
+// Can fighter `f` hit fighter `o`? Ground melee (neither flying nor antiAir) cannot hit flying foes
+export const canHit = (f: Fighter, o: Fighter) => !o.flying || Boolean(f.flying || f.antiAir);
+
 // --- One step of the battle ---
 function nearestFoe(b: Battle, f: Fighter) {
     let best: Fighter | null = null;
     for (const o of b.fighters) {
-        if (o.side === f.side || o.hp <= 0) continue;
+        if (o.side === f.side || o.hp <= 0 || !canHit(f, o)) continue;
         // Only what is ahead
         if (f.side === 'ally' ? o.x > f.x : o.x < f.x) continue;
         if (!best || Math.abs(o.x - f.x) < Math.abs(best.x - f.x)) best = o;
@@ -475,11 +515,19 @@ function nearestFoe(b: Battle, f: Fighter) {
 // The gap between the fronts of two bodies
 const gap = (f: Fighter, o: Fighter) => Math.abs(o.x - f.x) - (f.size + o.size) / 2;
 
-// The one it hits: the nearest, but a ネコ (snipe) aims first at one that heals in its reach
+// The one it hits: the nearest, but a ネコ/ゾウ (snipe) aims first at one that heals, and antiAir specialists prefer flying foes
 function targetOf(b: Battle, f: Fighter, nearest: Fighter | null): Fighter | null {
-    if (!f.snipe || !nearest) return nearest;
+    if (!nearest) return null;
     const ahead = (o: Fighter) => (f.side === 'ally' ? o.x <= f.x : o.x >= f.x);
-    return b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.heal && ahead(o) && gap(f, o) <= f.range) ?? nearest;
+    if (f.snipe) {
+        const healer = b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.heal && canHit(f, o) && ahead(o) && gap(f, o) <= f.range);
+        if (healer) return healer;
+    }
+    if (f.antiAirBonus) {
+        const flyer = b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.flying && ahead(o) && gap(f, o) <= f.range);
+        if (flyer) return flyer;
+    }
+    return nearest;
 }
 
 function fight(b: Battle, f: Fighter, dt: number) {
@@ -500,44 +548,51 @@ function fight(b: Battle, f: Fighter, dt: number) {
     const toBase = Math.abs(baseX - f.x) - f.size / 2;
     const foeInReach = foe !== null && gap(f, foe) <= f.range;
     // A ふかふか or ふたご in its reach stands in the way of what it throws: it hits that, not the base
-    const wall = foeInReach && f.range > 100 ? b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.soft && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range) : undefined;
+    const wall = foeInReach && f.range > 100 ? b.fighters.find(o => o.side !== f.side && o.hp > 0 && o.soft && !o.flying && canHit(f, o) && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range) : undefined;
     const aim = wall ?? (foeInReach ? targetOf(b, f, foe) : foe);
     f.fighting = foeInReach || toBase <= f.range;
+    f.targetFlying = Boolean(foeInReach && (aim ?? foe)?.flying);
     if (!f.fighting) {
         let x = f.x + dir * f.speed * (dt / 1000);
-        // Not into the one ahead
-        if (foe) x = ally ? Math.max(x, foe.x + (foe.size + f.size) / 2) : Math.min(x, foe.x - (foe.size + f.size) / 2);
+        // Not into the one ahead (only when on the same altitude layer, or when anti-air stops at its range)
+        if (foe && Boolean(foe.flying) === Boolean(f.flying)) {
+            x = ally ? Math.max(x, foe.x + (foe.size + f.size) / 2) : Math.min(x, foe.x - (foe.size + f.size) / 2);
+        }
         f.x = x;
         return;
     }
     if (f.wait > 0) return;
     f.wait = f.attackMs;
     // Something thrown, to be seen flying (it hits at once all the same)
-    if (f.range > 100) b.fx.push({ kind: 'shot', x: f.x, to: foeInReach && aim ? aim.x : baseX, ms: 0, total: 350, who: whoOf(f) });
+    if (f.range > 100) {
+        const hitTarget = foeInReach && aim;
+        b.fx.push({ kind: 'shot', x: f.x, to: hitTarget ? aim.x : baseX, toFlying: hitTarget ? Boolean(aim.flying) : false, ms: 0, total: 350, who: whoOf(f) });
+    }
     const power = ally && b.boostMs > 0 ? f.attack * b.boostRate : f.attack;
     // At the base, the base first: the enemies that keep coming out of it would else hold back the
     // units that got there for ever
     const baseInReach = toBase <= f.range && !wall;
     if (foeInReach && foe && !baseInReach) {
         const hit = f.area
-            ? b.fighters.filter(o => o.side !== f.side && o.hp > 0 && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range)
+            ? b.fighters.filter(o => o.side !== f.side && o.hp > 0 && canHit(f, o) && (ally ? o.x <= f.x : o.x >= f.x) && gap(f, o) <= f.range)
             : [aim ?? foe];
         // The ground shakes where it hits (far off for one that throws)
-        if (f.area) b.fx.push({ kind: 'stomp', x: f.range > 100 ? foe.x : f.x, ms: 0, total: 450, who: whoOf(f) });
+        if (f.area) b.fx.push({ kind: 'stomp', x: f.range > 100 ? (aim ?? foe).x : f.x, ms: 0, total: 450, who: whoOf(f) });
         for (const o of hit) {
             const k = affinity(f.element, o.element, 'unit');
             const soft = !o.soft ? 1 : o.soft.except.includes(f.kind as UnitId) ? o.soft.bane : o.soft.part;
+            const air = o.flying && f.antiAirBonus ? f.antiAirBonus : 1;
             // In the ふとん バリア: nothing gets through (only a spell breaks it)
             if (o.pillow) continue;
-            harm(o, power * k * soft);
+            harm(o, power * k * soft * air);
             if (f.stun && o.shield <= 0 && o.stopMs < f.stun) {
                 o.stopMs = f.stun;
                 o.startled = true;
             }
-            if (k > 1) b.fx.push({ kind: 'spark', x: o.x, ms: 0, total: 300, who: whoOf(o) });
+            if (k > 1 || air > 1) b.fx.push({ kind: 'spark', x: o.x, ms: 0, total: 300, who: whoOf(o) });
             if (f.knockback > 0 && !o.heavy) {
-                // A ふたご holds firm as it holds against the hit
-                const back = f.knockback * (o.boss ? 0.25 : 1) * Math.min(1, soft);
+                // A ふたご holds firm as it holds against the hit; kasa blows back farther
+                const back = f.knockback * (o.boss ? 0.25 : 1) * (o.kbVuln ?? 1) * Math.min(1, soft);
                 o.x = ally ? Math.max(LANE.enemyBase + o.size / 2, o.x - back) : Math.min(LANE.allyBase - o.size / 2, o.x + back);
             }
         }
@@ -552,6 +607,7 @@ function fight(b: Battle, f: Fighter, dt: number) {
 export function step(b: Battle, dt: number) {
     for (const fx of b.fx) fx.ms += dt;
     b.fx = b.fx.filter(fx => fx.ms < fx.total);
+    b.shakeMs = Math.max(0, b.shakeMs - dt);
     if (b.result) return;
     b.time += dt;
     const sec = dt / 1000;
@@ -605,16 +661,25 @@ export function step(b: Battle, dt: number) {
 
     for (const f of b.fighters) {
         if (f.hp > 0) continue;
-        b.fx.push({ kind: 'fly', x: f.x, ms: 0, total: 1200, who: whoOf(f) });
+        const big = f.boss || Boolean(f.spellHit);
+        b.fx.push({ kind: 'fly', x: f.x, ms: 0, total: big ? 1600 : 1350, who: whoOf(f), seed: f.id, big });
         if (f.side === 'enemy') {
             b.money = Math.min(walletOf(b).cap, b.money + f.money);
             b.mana = Math.min(MANA_MAX, b.mana + f.mana);
             b.kills++;
-            b.events.push('fall');
+            if (f.boss) {
+                b.events.push('bossFall');
+                b.shakeMs = Math.max(b.shakeMs, 520);
+                b.shakeAmp = Math.max(b.shakeAmp, 9);
+            } else {
+                b.events.push('fall');
+            }
             // ふたご: two come out where it fell
             const parts = f.burnMs ? 0 : f.split ?? 0;
             for (let k = 0; k < parts; k++) enemyAt(b, SPLIT_INTO, f.element, false, Math.max(LANE.enemyBase + 20, f.x - 22 + k * 30));
             if (parts) b.fx.push({ kind: 'split', x: f.x, ms: 0, total: 700, who: whoOf(f) });
+        } else {
+            b.events.push('allyFall');
         }
     }
     b.fighters = b.fighters.filter(f => f.hp > 0);

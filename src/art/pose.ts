@@ -1,7 +1,7 @@
 // --- What a character is doing, for its picture ---
 import type { EyeKind, MouthKind } from './parts';
 
-export type Mood = 'dizzy' | 'cheer';
+export type Mood = 'dizzy' | 'cheer' | 'shock' | 'ko';
 
 export interface Pose {
     // ms (makes everything move: blinking, wobbling, walking)
@@ -33,6 +33,8 @@ export const blinking = (p: Pose) => (p.t + p.seed * 997) % 3200 < 120;
 
 // The face for this pose; `eyes` and `smile` are the usual ones of the character
 export function faceOf(p: Pose, eyes: EyeKind = 'open', smile: MouthKind = 'smile'): { eyes: EyeKind; mouth: MouthKind } {
+    if (p.mood === 'shock') return { eyes: 'pop', mouth: 'scream' };
+    if (p.mood === 'ko') return { eyes: 'x', mouth: 'scream' };
     if (p.mood === 'dizzy') return { eyes: 'spiral', mouth: 'wavy' };
     if (p.mood === 'cheer') return { eyes: 'happy', mouth: 'open' };
     if (p.hurt > 0.2) return { eyes: 'shut', mouth: 'wavy' };

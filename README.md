@@ -10,7 +10,7 @@ Node.js 20.19 以上（推奨 24）
 
 ```sh
 npm install
-npm run dev      # 開発サーバー。/practice.html が手書きの練習ページ（?debug で判定の数値も出る）
+npm run dev      # 開発サーバー。/practice.html が漢字・モールス信号の練習ページ（?debug で判定の数値も出る）、/debug.html が全キャラクター＆動き確認用のデバッグページ
 npm test         # Vitest（流用した kanji-quiz のテストも走る。ステージを自動で遊ぶテストもある：ステージ11からは工夫しないと勝てないことも確かめる）
 npm run build    # vue-tsc --noEmit と vite build。dist/ に静的ファイルを出力する
 npm run radicals # KanjiVG から src/spell/radicals.ts（部首のデータ）を作り直す

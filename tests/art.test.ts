@@ -39,7 +39,7 @@ const poses = (form: 0 | 1 | 2, color: string): Pose[] => {
     const p = restPose(form, color, 1234);
     return [
         p, { ...p, walk: 1 }, { ...p, windup: 0.8 }, { ...p, attack: 1 }, { ...p, hurt: 1 }, { ...p, stopped: true },
-        { ...p, mood: 'dizzy' }, { ...p, mood: 'cheer' }, { ...p, t: 0 }
+        { ...p, mood: 'dizzy' }, { ...p, mood: 'cheer' }, { ...p, mood: 'shock' }, { ...p, mood: 'ko' }, { ...p, t: 0 }
     ];
 };
 
@@ -100,16 +100,29 @@ describe('the pictures', () => {
         expect(sceneOf(99)).toEqual(sceneOf(1));
     });
 
-    it('the effects of the fighters draw from start to end', () => {
+    it('the effects of the fighters draw from start to end (all 5 KO styles & air projectiles)', () => {
         const who = { kind: 'neko' as const, form: 1 as const, side: 'ally' as const, size: 34, color: '#fff', element: 'fire' as const };
         const boss = { kind: 'boss' as const, form: 0 as const, side: 'enemy' as const, size: 72, color: '#7a2c4d', element: null };
-        for (const t of [0, 0.3, 0.8, 0.95, 1]) {
+        const flyers = [
+            { kind: 'kasa' as const, form: 0 as const, side: 'enemy' as const, size: 34, color: '#9ad4e8', element: null, flying: true },
+            { kind: 'fuusen' as const, form: 0 as const, side: 'enemy' as const, size: 36, color: '#ffb5d8', element: null, flying: true },
+            { kind: 'ufo' as const, form: 0 as const, side: 'enemy' as const, size: 46, color: '#9c89d9', element: null, flying: true },
+            { kind: 'hard' as const, form: 0 as const, side: 'enemy' as const, size: 40, color: '#8d8a84', element: null }
+        ];
+        for (const t of [0, 0.1, 0.3, 0.55, 0.8, 0.95, 1]) {
             const { ctx, count } = fakeCtx();
-            drawFly(ctx, who, 500, 330, t, t * 1000);
-            drawFly(ctx, boss, 500, 330, t, t * 1000);
-            drawShot(ctx, who, 500, 300, 330, t, t * 300);
-            drawShot(ctx, { ...who, kind: 'thrower', side: 'enemy' }, 300, 500, 330, t, t * 300);
-            drawStomp(ctx, 500, 330, t);
+            for (let seed = 0; seed < 5; seed++) {
+                drawFly(ctx, who, 500, 330, t, t * 1000, seed, false);
+                drawFly(ctx, boss, 500, 330, t, t * 1000, seed, true);
+            }
+            for (const f of flyers) drawFly(ctx, f, 500, 330, t, t * 1000, 1, false);
+            for (const kind of ['neko', 'zou', 'fukurou', 'buta'] as const) {
+                drawShot(ctx, { ...who, kind, flying: kind === 'fukurou' || kind === 'buta' }, 500, 300, 330, t, t * 300, true);
+            }
+            for (const kind of ['thrower', 'bento', 'fuusen', 'ufo', 'singer', 'king'] as const) {
+                drawShot(ctx, { ...who, kind, side: 'enemy', flying: kind === 'fuusen' || kind === 'ufo' }, 300, 500, 330, t, t * 300, false);
+            }
+            drawStomp(ctx, 500, 330, t, 'ドンドコ！');
             expect(count.save).toBe(count.restore);
         }
     });
@@ -151,9 +164,16 @@ describe('the pictures', () => {
         for (const n of names) expect(bareKanji(n), n).toEqual([]);
         // Everything the pictures write on the field (no ruby on a canvas)
         const { ctx, count } = fakeCtx();
-        for (const e of Object.values(ENEMIES)) for (const p of poses(0, e.color)) for (const t of [0, 1500, 3000]) ART[e.id](ctx, 72, { ...p, t });
-        for (const t of [0, 0.5]) drawFly(ctx, { kind: 'purun', form: 0, side: 'ally', size: 34, color: '#fff', element: 'water' }, 0, 330, t, 0);
-        drawStomp(ctx, 0, 330, 0.1);
+        for (const e of Object.values(ENEMIES)) {
+            for (const p of poses(0, e.color)) for (const t of [0, 1500, 3000]) ART[e.id](ctx, 72, { ...p, t });
+            for (let seed = 0; seed < 12; seed++) {
+                for (const t of [0.1, 0.45, 0.85]) drawFly(ctx, { kind: e.id, form: 0, side: 'enemy', size: e.size, color: e.color, element: null, flying: e.flying }, 400, 330, t, t * 1000, seed, e.boss);
+            }
+        }
+        for (let seed = 0; seed < 10; seed++) {
+            for (const t of [0.1, 0.45, 0.85]) drawFly(ctx, { kind: 'purun', form: 0, side: 'ally', size: 34, color: '#fff', element: 'water' }, 400, 330, t, t * 1000, seed, false);
+        }
+        for (const snd of ['ドスン', 'ドンドコ！', 'ドッカーン！', 'ピピピー！', 'ジリリリ！', 'もくもく〜']) drawStomp(ctx, 0, 330, 0.1, snd);
         drawPillowTower(ctx, 0, 330, 1, 1, 0);
         for (const w of count.texts) expect(canShow(w, 1), w).toBe(true);
     });

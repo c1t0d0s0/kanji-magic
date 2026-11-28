@@ -4,7 +4,7 @@
 import type { SpellGroup } from './spell/effects';
 
 export type SoundName =
-    | 'tap' | 'summon' | 'hit' | 'fall' | 'base' | 'wallet' | 'win' | 'lose' | 'open' | 'rune'
+    | 'tap' | 'summon' | 'hit' | 'fall' | 'allyFall' | 'bossFall' | 'base' | 'wallet' | 'win' | 'lose' | 'open' | 'rune'
     | 'perfect' | 'success' | 'close' | 'fail' | SpellGroup
     // The enemy's magic: told (warn), going off, stopped by the barrier; a big wave comes out
     | 'warn' | 'enemyMagic' | 'blocked' | 'wave';
@@ -14,7 +14,8 @@ let master: GainNode | null = null;
 let volume = 0.7;
 // Many hits in a moment would be noise: the same sound is not played again so soon
 const lastPlayed = new Map<SoundName, number>();
-const MIN_GAP_MS: Partial<Record<SoundName, number>> = { hit: 90, fall: 60, base: 150, rune: 40 };
+const MIN_GAP_MS: Partial<Record<SoundName, number>> = { hit: 90, fall: 70, allyFall: 90, base: 150, rune: 40 };
+let fallCount = 0;
 
 function audio() {
     if (ctx) return ctx;
@@ -89,7 +90,33 @@ export function play(name: SoundName) {
         case 'tap': tone(660, 0, 0.06, 'square', 0.08); break;
         case 'summon': tone(440, 0, 0.12, 'triangle', 0.2, 880); break;
         case 'hit': noise(0, 0.05, 0.08, 2500); break;
-        case 'fall': tone(520, 0, 0.15, 'square', 0.08, 180); break;
+        case 'fall': {
+            // Slapstick cartoon KO variations: slide whistle pop, boing spring, or comic zip!
+            const v = fallCount++ % 3;
+            if (v === 0) {
+                tone(340, 0, 0.14, 'triangle', 0.14, 1180);
+                tone(1320, 0.13, 0.08, 'sine', 0.12, 880);
+            } else if (v === 1) {
+                tone(200, 0, 0.09, 'sine', 0.16, 620);
+                tone(620, 0.08, 0.12, 'sine', 0.14, 280);
+                tone(280, 0.18, 0.1, 'triangle', 0.11, 540);
+            } else {
+                noise(0, 0.06, 0.1, 1800);
+                tone(880, 0.03, 0.18, 'triangle', 0.13, 210);
+            }
+            break;
+        }
+        case 'allyFall':
+            // Comical "pyororoon!" when an ally gets bonked away
+            tone(580, 0, 0.09, 'sine', 0.11, 340);
+            tone(420, 0.08, 0.14, 'triangle', 0.1, 180);
+            break;
+        case 'bossFall':
+            // Big slapstick explosion + high slide whistle + kirān twinkle!
+            noise(0, 0.25, 0.28, 700);
+            tone(220, 0.05, 0.45, 'triangle', 0.2, 1380);
+            notes([1047, 1319, 1568, 2093], 0.08, 0.22, 'sine', 0.18);
+            break;
         case 'base': noise(0, 0.12, 0.15, 500); break;
         case 'wallet': notes([880, 1320], 0.07, 0.12, 'square', 0.1); break;
         case 'win': notes([523, 659, 784, 1047], 0.13, 0.3); break;

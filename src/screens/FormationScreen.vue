@@ -61,8 +61,9 @@ function start() {
             <p>ステージ {{ stage.id }}：<Furi :text="stage.name" /></p>
             <div class="foes">
                 <span class="foes-title"><Furi text="[出|で]てくる [敵|てき]" /></span>
-                <span v-for="(f, i) in foes" :key="i" class="foe">
+                <span v-for="(f, i) in foes" :key="i" class="foe" :class="{ 'is-air': ENEMIES[f.enemy].flying }">
                     <CharacterIcon :kind="f.enemy" :element="f.element === 'cycle' ? 'fire' : f.element" :size="40" />
+                    <span v-if="ENEMIES[f.enemy].flying" class="air-tag" aria-label="空を 飛ぶ">☁️</span>
                     <ElementMark v-if="f.element" :mark="f.element" :size="18" />
                 </span>
             </div>
@@ -87,9 +88,15 @@ function start() {
         <ul class="units">
             <li v-for="u in units" :key="u.id" class="card unit" :class="{ locked: !u.open }">
                 <template v-if="u.open">
-                    <span class="unit-look" aria-hidden="true"><CharacterIcon :kind="u.id" :form="formOf(u.level)" :size="64" :animate="u.inDeck" /></span>
+                    <span class="unit-look" aria-hidden="true"><CharacterIcon :kind="u.id" :form="formOf(u.level)" :size="56" :animate="u.inDeck" /></span>
                     <div class="unit-text">
-                        <p class="unit-name"><ElementMark :mark="UNITS[u.id].element" :size="20" /> <Furi :text="u.s.form.name" /> <small>Lv{{ u.level }}</small></p>
+                        <p class="unit-name">
+                            <ElementMark :mark="UNITS[u.id].element" :size="18" />
+                            <Furi :text="u.s.form.name" />
+                            <small>Lv{{ u.level }}</small>
+                            <span v-if="UNITS[u.id].flying" class="badge air"><Furi text="☁️ [空|そら]" /></span>
+                            <span v-else-if="UNITS[u.id].antiAir" class="badge antiair"><Furi text="🎯 [空|そら]OK" /></span>
+                        </p>
                         <p class="unit-stats"><Furi :text="`${UNITS[u.id].role}・[体力|たいりょく] ${u.s.hp}・[攻撃|こうげき] ${u.s.attack}・${u.s.cost}[円|えん]`" /></p>
                     </div>
                     <div class="unit-actions">
@@ -178,6 +185,38 @@ function start() {
     align-items: center;
 }
 
+.foe.is-air {
+    padding: 0 0.25rem;
+    border-radius: 999px;
+    background: rgb(110 198 255 / 0.22);
+}
+
+.air-tag {
+    font-size: 0.75rem;
+    margin-left: -0.15rem;
+}
+
+.badge {
+    display: inline-block;
+    margin-left: 0.25rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    font-family: var(--ui);
+    font-size: 0.72rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.badge.air {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.badge.antiair {
+    background: #fef3c7;
+    color: #b45309;
+}
+
 /* From the 11th stage: how to beat each enemy, and the big waves */
 .foe-tips {
     display: grid;
@@ -259,14 +298,15 @@ function start() {
 
 .units {
     display: grid;
-    gap: 0.6rem;
+    gap: 0.45rem;
 }
 
 .unit {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem 0.65rem;
+    padding: 0.55rem 0.75rem;
 }
 
 .unit.locked {
@@ -277,12 +317,12 @@ function start() {
     display: grid;
     place-items: center;
     flex: none;
-    width: 4rem;
-    height: 4rem;
+    width: 3.5rem;
+    height: 3.5rem;
     border-radius: 50%;
     background: var(--rule-soft);
     overflow: hidden;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
 }
 
 .unit-text {

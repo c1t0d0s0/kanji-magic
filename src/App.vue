@@ -10,6 +10,7 @@ import FormationScreen from './screens/FormationScreen.vue';
 import BattleScreen from './screens/BattleScreen.vue';
 import ResultScreen from './screens/ResultScreen.vue';
 import MagicBook from './screens/MagicBook.vue';
+import CharacterList from './screens/CharacterList.vue';
 import SettingsScreen from './screens/SettingsScreen.vue';
 import CreditsScreen from './screens/CreditsScreen.vue';
 import { unlockAudio } from './sound';
@@ -32,6 +33,7 @@ watchEffect(() => (document.title = textFor('KM[魔法|まほう][大|だい][�
     <BattleScreen v-else-if="ui.screen === 'battle'" />
     <ResultScreen v-else-if="ui.screen === 'result'" />
     <MagicBook v-else-if="ui.screen === 'book'" />
+    <CharacterList v-else-if="ui.screen === 'characters'" />
     <SettingsScreen v-else-if="ui.screen === 'settings'" />
     <CreditsScreen v-else-if="ui.screen === 'credits'" />
     <!-- The battle has its own (it is part of its page) -->

@@ -6,7 +6,7 @@
 // their element. Only the pictures: the battle is the same.
 import { drawMushroomHouse, drawPillowTower } from '../art/bases';
 import { ART } from '../art/characters';
-import { drawFly, drawShot, drawStomp } from '../art/fx';
+import { drawFly, drawShot, drawStomp, FLY_HEIGHT } from '../art/fx';
 import { drawMark, MARK_PATHS } from '../art/marks';
 import { shout, star } from '../art/parts';
 import type { Pose } from '../art/pose';
@@ -102,36 +102,48 @@ export function poseOf(f: Fighter, time: number): Pose {
     };
 }
 
+// Deterministic slight depth offset per fighter so big crowds look lively instead of stacked flat
+const depthOf = (f: Fighter) => ((f.id * 37) % 15) - 7;
+
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, boosted: boolean) {
     const size = drawn(f.size);
     const r = size / 2;
+    const pose = poseOf(f, time);
+    const groundY = GROUND + depthOf(f);
+    // Flying units hover high above the lane; バネうさぎ leaps into the sky when striking a flying foe!
+    const flyBob = f.flying ? Math.sin(time / 240 + f.id * 1.3) * 6 : 0;
+    const jumpUp = f.kind === 'usagi' && f.targetFlying && pose.attack > 0 ? Math.sin(Math.PI * pose.attack) * (FLY_HEIGHT * 0.72) : 0;
+    const bodyY = (f.flying ? groundY - FLY_HEIGHT + flyBob : groundY) - jumpUp;
+    const shadowScale = f.flying ? 0.65 : jumpUp > 0 ? Math.max(0.55, 1 - jumpUp / 160) : 1;
     if (look.ring && f.element) {
         // The colour of its element under its feet: seen even when the mark is hidden
         const color = MARK_PATHS[f.element].color;
         ctx.save();
-        ctx.globalAlpha = 0.55;
+        ctx.globalAlpha = f.flying ? 0.35 : 0.55;
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.ellipse(f.x, GROUND, r * 1.1, r * 0.28, 0, 0, Math.PI * 2);
+        ctx.ellipse(f.x, groundY, r * 1.1 * shadowScale, r * 0.28 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.globalAlpha = f.flying ? 0.65 : 1;
         ctx.strokeStyle = color;
         ctx.lineWidth = 2.5 * look.boost;
         ctx.stroke();
         ctx.restore();
     } else {
-        ctx.fillStyle = 'rgb(0 0 0 / 0.16)';
+        ctx.fillStyle = f.flying ? 'rgb(0 0 0 / 0.12)' : 'rgb(0 0 0 / 0.16)';
         ctx.beginPath();
-        ctx.ellipse(f.x, GROUND, r * 1.05, r * 0.22, 0, 0, Math.PI * 2);
+        ctx.ellipse(f.x, groundY, r * 1.05 * shadowScale, r * 0.22 * shadowScale, 0, 0, Math.PI * 2);
         ctx.fill();
     }
     ctx.save();
-    ctx.translate(f.x, GROUND);
+    ctx.translate(f.x, bodyY);
     // Pictures face right: ours walk to the left
     if (f.side === 'ally') ctx.scale(-1, 1);
-    ART[f.kind](ctx, size, poseOf(f, time));
+    ART[f.kind](ctx, size, pose);
     ctx.restore();
-    const y = GROUND - r;
+    const y = bodyY - r;
     if (f.shield > 0) {
         // Ours: the blue barrier of かね. The enemies: the pink one of ふとん バリア
         const ally = f.side === 'ally';
@@ -144,7 +156,7 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
         ctx.stroke();
     }
     if (f.stopMs > 0 && f.startled) {
-        // Startled by a めざまし or the ゆめのまおう: stars going round the head
+        // Startled by a めざまし, UFO or the ゆめのまおう: stars going round the head
         for (let k = 0; k < 3; k++) {
             const a = time / 180 + (k * Math.PI * 2) / 3;
             star(ctx, f.x + Math.cos(a) * r * 0.7, y - r - 4 * look.boost + Math.sin(a) * 4 * look.boost, 5 * look.boost, '#ffd84a', a);
@@ -185,13 +197,13 @@ function drawFighter(ctx: CanvasRenderingContext2D, f: Fighter, time: number, bo
             ctx.fill();
         }
     }
-    if (boosted && f.side === 'ally') star(ctx, f.x - r * 0.8, GROUND - size - 6 + Math.sin(time / 120 + f.id) * 3, 6 * look.boost, '#ffd84a', time / 300);
+    if (boosted && f.side === 'ally') star(ctx, f.x - r * 0.8, bodyY - size - 6 + Math.sin(time / 120 + f.id) * 3, 6 * look.boost, '#ffd84a', time / 300);
     // The element, over the head
     const mark = f.boss ? look.bossMarkPx : look.markPx;
-    if (f.element) drawMark(ctx, f.element, f.x + (f.side === 'ally' ? r * 0.55 : -r * 0.55), GROUND - size * 1.05 - (mark - 15) * 0.3, mark);
+    if (f.element) drawMark(ctx, f.element, f.x + (f.side === 'ally' ? r * 0.55 : -r * 0.55), bodyY - size * 1.05 - (mark - 15) * 0.3, mark);
     if (f.hp < f.maxHp) {
         const h = 7 * look.boost;
-        bar(ctx, f.x, GROUND - size * 1.15 - 18 * look.boost, Math.max(30, f.size) * look.boost, f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d', h);
+        bar(ctx, f.x, bodyY - size * 1.15 - 18 * look.boost, Math.max(30, f.size) * look.boost, f.hp / f.maxHp, f.side === 'ally' ? '#4c9be0' : '#e5533d', h);
     }
 }
 
@@ -225,25 +237,35 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
     switch (fx.kind) {
         case 'fly':
             if (t < 0.25) {
+                const ringY = (fx.who?.flying ? GROUND - FLY_HEIGHT : GROUND) - 25;
                 ctx.strokeStyle = `rgb(255 255 255 / ${1 - t * 4})`;
-                ctx.lineWidth = 4;
+                ctx.lineWidth = fx.big ? 6 : 4;
                 ctx.beginPath();
-                ctx.arc(fx.x, GROUND - 25, 10 + 120 * t, 0, Math.PI * 2);
+                ctx.arc(fx.x, ringY, 10 + (fx.big ? 170 : 120) * t, 0, Math.PI * 2);
                 ctx.stroke();
             }
-            if (fx.who) drawFly(ctx, grown(fx.who), fx.x, GROUND, t, fx.ms);
+            if (fx.who) drawFly(ctx, grown(fx.who), fx.x, GROUND, t, fx.ms, fx.seed ?? 0, Boolean(fx.big));
             break;
         case 'shot':
-            if (fx.who && fx.to !== undefined) drawShot(ctx, grown(fx.who), fx.x, fx.to, GROUND, t, fx.ms);
+            if (fx.who && fx.to !== undefined) drawShot(ctx, grown(fx.who), fx.x, fx.to, GROUND, t, fx.ms, Boolean(fx.toFlying));
             break;
-        case 'stomp':
-            // The hippo's stamp, the alarm clock's ring, the king's dream cloud
-            drawStomp(ctx, fx.x, GROUND, t, fx.who?.kind === 'bell' ? 'ジリリリ！' : fx.who?.kind === 'king' ? 'もくもく〜' : 'ドスン');
+        case 'stomp': {
+            // The hippo's stamp, taiko drum, sky bomb, alarm clock's ring, UFO beam, king's dream cloud
+            const sound = fx.who?.kind === 'bell' ? 'ジリリリ！'
+                : fx.who?.kind === 'king' ? 'もくもく〜'
+                : fx.who?.kind === 'tanuki' ? 'ドンドコ！'
+                : fx.who?.kind === 'buta' ? 'ドッカーン！'
+                : fx.who?.kind === 'ufo' ? 'ピピピー！'
+                : 'ドスン';
+            drawStomp(ctx, fx.x, GROUND, t, sound);
             break;
-        case 'heal':
+        }
+        case 'heal': {
             // A lullaby healed it: a green ＋ rises
-            if (fx.who) shout(ctx, '＋', fx.x, GROUND - drawn(fx.who.size) - 10 - t * 30, 26 * look.boost, '#2b9348', fade * 1.5);
+            const base = fx.who?.flying ? GROUND - FLY_HEIGHT : GROUND;
+            if (fx.who) shout(ctx, '＋', fx.x, base - drawn(fx.who.size) - 10 - t * 30, 26 * look.boost, '#2b9348', fade * 1.5);
             break;
+        }
         case 'split':
             // A ふたご came apart: a puff and パカッ
             ctx.fillStyle = `rgb(255 255 255 / ${0.8 * fade})`;
@@ -252,14 +274,16 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             ctx.fill();
             shout(ctx, 'パカッ', fx.x, GROUND - 90 * look.boost - t * 20, 22 * look.boost, '#b5179e', fade * 1.5);
             break;
-        case 'spark':
-            // A hit on the element it beats: stars burst out
+        case 'spark': {
+            // A hit on the element it beats or anti-air bonus: stars burst out
+            const base = fx.who?.flying ? GROUND - FLY_HEIGHT : GROUND;
             for (let k = 0; k < 4; k++) {
                 const a = (k * Math.PI) / 2 + t * 2;
                 const d = 14 * look.boost * (0.5 + t);
-                star(ctx, fx.x + Math.cos(a) * d, GROUND - (fx.who?.size ?? 30) * 0.7 * look.boost + Math.sin(a) * d, 6 * look.boost * fade, '#ffe14a', a);
+                star(ctx, fx.x + Math.cos(a) * d, base - (fx.who?.size ?? 30) * 0.7 * look.boost + Math.sin(a) * d, 6 * look.boost * fade, '#ffe14a', a);
             }
             break;
+        }
         case 'good':
             shout(ctx, 'よく きいた！', width / 2, 150 - t * 20, 40, '#e8590c', fade * 1.5);
             break;
@@ -347,7 +371,8 @@ function drawFx(ctx: CanvasRenderingContext2D, fx: Fx, width: number) {
             // Bigger on a small field, but not as much as the characters (the numbers would cover them)
             const k = 1 + (look.boost - 1) * 0.6;
             const px = (big ? 40 : small ? 24 : 32) * pop * k;
-            const y = GROUND - drawn(fx.who.size) * 1.15 - 34 * k - ease(t) * 40 - (fx.stack ?? 0) * 46 * k;
+            const base = fx.who.flying ? GROUND - FLY_HEIGHT : GROUND;
+            const y = base - drawn(fx.who.size) * 1.15 - 34 * k - ease(t) * 40 - (fx.stack ?? 0) * 46 * k;
             shout(ctx, `-${fx.amount}${big ? '!' : ''}`, fx.x, y, px, big ? '#d9480f' : small ? '#6c757d' : '#c92a2a', Math.min(1, fade * 2.5));
             break;
         }
@@ -440,6 +465,11 @@ export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: numb
     const w = LANE.width;
     look = lookFor(cssPerUnit);
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.save();
+    if (b.shakeMs > 0 && !reducedMotion()) {
+        const amp = b.shakeAmp * Math.min(1, b.shakeMs / 250);
+        ctx.translate(Math.sin(b.time * 0.14) * amp, Math.cos(b.time * 0.19) * amp * 0.7);
+    }
     const scene = sceneOf(b.stage.id);
     // The clouds and the weather move with the clock, not the battle (they go on while the magic
     // circle is open)
@@ -449,10 +479,13 @@ export function drawBattle(ctx: CanvasRenderingContext2D, b: Battle, scale: numb
     drawBase(ctx, b.enemyBase, LANE.enemyBase, false, b.time, scene);
     drawBase(ctx, b.allyBase, LANE.allyBase, true, b.time, scene);
     drawCharge(ctx, b);
-    // Bigger ones behind
-    const order = [...b.fighters].sort((p, q) => q.size - p.size);
+    // Ground fighters sorted back-to-front by depth (and bigger behind), then flying fighters above
+    const order = [...b.fighters].sort((p, q) =>
+        (p.flying ? 1 : 0) - (q.flying ? 1 : 0) || depthOf(p) - depthOf(q) || q.size - p.size
+    );
     const boosted = b.boostMs > 0;
     for (const f of order) drawFighter(ctx, f, b.time, boosted);
     drawWeather(ctx, scene, w, GROUND, FIELD_HEIGHT, clock);
     for (const fx of b.fx) drawFx(ctx, fx, w);
+    ctx.restore();
 }
